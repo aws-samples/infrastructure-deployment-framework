@@ -1,0 +1,19 @@
+dist-name: Company Name
+country: Country Code
+intro-p1: This app can be used to configure and deploy infrastructure into an AWS account to which you have access.
+intro-p2: It can deploy standard CloudFormation templates but it can also bootstrap an account for CDK and deploy CDK apps, as well as run useful SDK commands.
+credentials-h2: Credentials
+credentials-p1: Enter the credentials for the account you want to operate on here.
+credentials-p2:
+  <b>Note:</b> <a href=https://aws.amazon.com/blogs/enterprise-strategy/security-at-aws/ target=_blank>Security
+  is job zero</a>, so this app does not store credentials. You will need to enter credentials each time you use
+  this app. We recommend you always use temporary credentials and <a
+  href=https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html target=_blank>do not use
+  the root user for day-to-day operations</a>. Please ensure you <a
+  href=https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html#ru-bp-mfa
+  target=_blank>protect the root user with MFA</a>.
+credentials-h3: Temporary (Recommended)
+credentials-p3: You can <a target="_blank"
+  href="https://aws.amazon.com/blogs/security/aws-single-sign-on-now-enables-command-line-interface-access-for-aws-accounts-using-corporate-credentials/">get
+  temporary credentials</a> from IAM Identity Center.
+credentials-h4: Long-Lived

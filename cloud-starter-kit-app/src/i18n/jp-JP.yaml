@@ -1,0 +1,18 @@
+dist-name: 販売代理店名
+country: 国
+intro-p1: このアプリを使用すると、アクセス権のある AWS アカウントにインフラストラクチャを構成およびデプロイできます。
+intro-p2: 標準の CloudFormation テンプレートをデプロイできますが、CDK アプリのブートストラップ、作成、デプロイ、便利な SDK コマンドの実行も可能です。
+credentials-h2: 資格
+credentials-p1: ここに操作したいアカウントの資格情報を入力します。
+credentials-p2:
+  <b>注:</b> <a href=https://aws.amazon.com/blogs/enterprise-strategy/security-at-aws/ target=_blank>セキュリティ
+  ジョブ 0</a> であるため、このアプリは認証情報を保存しません。使用するたびに認証情報を入力する必要があります
+  このアプリ。常に一時的な認証情報を使用することをお勧めします。<a
+  href=https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html target=_blank>使用しないでください
+  日常的な操作のための root ユーザー</a>。必ず<a
+  href=https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html#ru-bp-mfa
+  target=_blank>MFA で root ユーザーを保護</a>します。
+credentials-h3: 一時的な認証情報 (推奨)
+credentials-p3: を実行できます。<a target="_blank"
+  href="https://aws.amazon.com/blogs/security/aws-single-sign-on-now-enables-command-line-interface-access-for-aws-accounts-using-corporate-credentials/" >ゲット
+  IAM Identity Center からの一時認証情報</a>。

@@ -1,0 +1,28 @@
+# buildspec.yml
+# buildspec.yml
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - pwd
+      - ls -l
+      - cd $CODEBUILD_SRC_DIR
+      - ls -l
+      - echo $CODEBUILD_SRC_DIR
+      - npm install aws-cdk -g
+      - npm install
+  build:
+    commands:
+      - pwd
+      - ls -l
+      - cd $CODEBUILD_SRC_DIR
+      - ls -l
+      - cdk bootstrap
+      - cdk deploy --require-approval never
+cache:
+  paths:
+    - "node_modules/**/*"
+# artifacts:
+#   enable-symlinks: yes

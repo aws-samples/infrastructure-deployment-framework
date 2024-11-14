@@ -1,0 +1,220 @@
+{
+    "Description": "Cost management tools that help you to monitor and manage your AWS costs",
+    "Parameters": {
+        "BudgetLimit": {
+            "Type": "Number",
+            "Default": 100,
+            "Description": "Enter your $USD threshold here (ex: 100)"
+        },
+        "BudgetNotify": {
+            "Type": "String",
+            "Default": "+61",
+            "Description": "Specify where the notification should be sent (for SMS, specify the country code too, eg +61, and drop the leading 0)"
+        },
+        "BudgetNotifyMethod": {
+            "Type": "String",
+            "Default": "sms",
+            "AllowedValues": [
+                "sms",
+                "email"
+            ],
+            "Description": "Specify the notification method: sms for text message, email for email"
+        }
+    },
+    "Resources": {
+        "BillingTopicKey1E94F9A8": {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "KeyPolicy": {
+                    "Statement": [
+                        {
+                            "Action": "kms:*",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:iam::",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":root"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "Resource": "*"
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "EnableKeyRotation": true,
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "CostManagementStack"
+                    }
+                ]
+            },
+            "UpdateReplacePolicy": "Delete",
+            "DeletionPolicy": "Delete",
+            "Metadata": {
+                "aws:cdk:path": "CostManagementStack/BillingTopicKey/Resource"
+            }
+        },
+        "BillingTopicKeyAlias9604A58C": {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": "alias/billing-topic-key",
+                "TargetKeyId": {
+                    "Fn::GetAtt": [
+                        "BillingTopicKey1E94F9A8",
+                        "Arn"
+                    ]
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "CostManagementStack/BillingTopicKey/Alias/Resource"
+            }
+        },
+        "BillingSNSTopicDCB11227": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "KmsMasterKeyId": {
+                    "Fn::GetAtt": [
+                        "BillingTopicKey1E94F9A8",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "CostManagementStack"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "CostManagementStack/BillingSNSTopic/Resource"
+            }
+        },
+        "BillingSNSPolicyD4686BD2": {
+            "Type": "AWS::SNS::TopicPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sns:publish",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "budgets.amazonaws.com",
+                                    "cloudwatch.amazonaws.com"
+                                ]
+                            },
+                            "Resource": {
+                                "Ref": "BillingSNSTopicDCB11227"
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Topics": [
+                    {
+                        "Ref": "BillingSNSTopicDCB11227"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "CostManagementStack/BillingSNSPolicy/Resource"
+            }
+        },
+        "BillingSNSSubscription": {
+            "Type": "AWS::SNS::Subscription",
+            "Properties": {
+                "Protocol": {
+                    "Ref": "BudgetNotifyMethod"
+                },
+                "TopicArn": {
+                    "Ref": "BillingSNSTopicDCB11227"
+                },
+                "Endpoint": {
+                    "Ref": "BudgetNotify"
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "CostManagementStack/BillingSNSSubscription"
+            }
+        },
+        "Budget": {
+            "Type": "AWS::Budgets::Budget",
+            "Properties": {
+                "Budget": {
+                    "BudgetLimit": {
+                        "Amount": {
+                            "Ref": "BudgetLimit"
+                        },
+                        "Unit": "USD"
+                    },
+                    "BudgetName": "Budget",
+                    "BudgetType": "COST",
+                    "CostTypes": {
+                        "IncludeCredit": false,
+                        "IncludeDiscount": false,
+                        "IncludeOtherSubscription": false,
+                        "IncludeRecurring": false,
+                        "IncludeRefund": false,
+                        "IncludeSubscription": false,
+                        "IncludeSupport": false,
+                        "IncludeTax": false,
+                        "IncludeUpfront": false,
+                        "UseAmortized": false,
+                        "UseBlended": false
+                    },
+                    "TimePeriod": {
+                        "End": "1926864800",
+                        "Start": "1225864800"
+                    },
+                    "TimeUnit": "MONTHLY"
+                },
+                "NotificationsWithSubscribers": [
+                    {
+                        "Notification": {
+                            "ComparisonOperator": "GREATER_THAN",
+                            "NotificationType": "ACTUAL",
+                            "Threshold": 99,
+                            "ThresholdType": "PERCENTAGE"
+                        },
+                        "Subscribers": [
+                            {
+                                "Address": {
+                                    "Ref": "BillingSNSTopicDCB11227"
+                                },
+                                "SubscriptionType": "SNS"
+                            }
+                        ]
+                    },
+                    {
+                        "Notification": {
+                            "ComparisonOperator": "GREATER_THAN",
+                            "NotificationType": "ACTUAL",
+                            "Threshold": 80,
+                            "ThresholdType": "PERCENTAGE"
+                        },
+                        "Subscribers": [
+                            {
+                                "Address": {
+                                    "Ref": "BillingSNSTopicDCB11227"
+                                },
+                                "SubscriptionType": "SNS"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "CostManagementStack/Budget"
+            }
+        }
+    }
+}

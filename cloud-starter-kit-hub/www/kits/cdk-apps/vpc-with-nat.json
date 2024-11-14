@@ -1,0 +1,31 @@
+{
+    "ConfigFile": "parameters.json",
+    "Parameters": {
+        "natCount": {
+            "Label": "NAT Gateway Count",
+            "Description": "How many NAT Gateway instances do you want to include?",
+            "AllowedValues": [
+                1,
+                2,
+                3
+            ],
+            "Default": 1
+        }
+    },
+    "Tags": {},
+    "Stacks": [
+        {
+            "name": "csk-vpc-with-nat-stack",
+            "resourceCount": 36,
+            "hasOutputs": false
+        }
+    ],
+    "FileList": [
+        "vpc-with-nat/bin/vpc-with-nat.js",
+        "vpc-with-nat/lib/vpc-with-nat.js",
+        "vpc-with-nat/buildspec.yml",
+        "vpc-with-nat/cdk.json",
+        "vpc-with-nat/package.json",
+        "vpc-with-nat/parameters-template.json"
+    ]
+}

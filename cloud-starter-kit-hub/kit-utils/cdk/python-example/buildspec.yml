@@ -1,0 +1,21 @@
+# buildspec.yml
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+      python: 3.9
+    commands:
+      - npm install aws-cdk -g
+      - python -m venv /root/venv
+      - . /root/venv/bin/activate
+      - pip install -r requirements.txt
+  build:
+    commands:
+      - cdk bootstrap --termination-protection
+      - cdk deploy --require-approval never
+cache:
+  paths:
+    - "/root/.npm/**/*"
+    - "/root/venv/**/*"
+    - "/root/.cache/pip/**/*"

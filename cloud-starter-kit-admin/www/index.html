@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Cloud Starter Kit - Admin Portal</title>
+  <link rel="stylesheet" type="text/css" href="css/styleguide.css" />
+  <link rel="stylesheet" type="text/css" href="css/globals.css" />
+  <link rel="stylesheet" type="text/css" href="css/style.css">
+  <script>
+
+    let cookies = document.cookie.split(';');
+    let idToken = '';
+
+    for (let i = 0; i < cookies.length; i++) {
+      if (cookies[i].includes('idToken')) {
+        idToken = cookies[i].split('=')[1];
+      }
+    }
+    sessionStorage.setItem("id_token", idToken);
+
+  </script>
+
+</head>
+
+<body>
+  <div id="content-view">
+    <div class="left-hand-menu">
+
+      <div class="menu-item">
+        <img class="csk-logo" id="csk-logo" src="images/color-logo.png" alt="CSK Logo">
+      </div>
+      <div class="menu-item">
+        <h1 class="prod-name">Cloud Starter Kit</h1>
+        <h2 class="site-name">Admin Portal</h2>
+        <select name="distributor-options" id="distributor-options"></select>
+      </div>
+      <div class="left-hand-menu-items">
+        <div id="about-button" class="left-hand-menu-item" content="about-csk">About the CSK</div>
+        <div id="list-distributors-button" class="left-hand-menu-item" hidden content="list-distributors">List
+          Distributors</div>
+        <div id="create-distributor-button" class="left-hand-menu-item" hidden content="create-distributor">Create
+          Distributor</div>
+        <div id="list-customers-button" class="left-hand-menu-item" content="list-customers">List CSKs</div>
+        <div id="create-customer-button" class="left-hand-menu-item" content="create-customer">Create CSK</div>
+        <div id="reports-button" class="left-hand-menu-item" content="reports">CSK Reports</div>
+        <div id="config-button" class="left-hand-menu-item" content="config">Configuration</div>
+        <div id="manage-users-button" class="left-hand-menu-item" hidden content="manage-users">Manage Users</div>
+        <div id="edit-customer-button" class="left-hand-menu-item" hidden content="edit-customer">Edit CSK</div>
+        <div id="edit-distributor-button" class="left-hand-menu-item" hidden content="edit-distributor">Edit Distributor
+        </div>
+        <p class="logout" id="logout">Log Out</p>
+      </div>
+      <div class="distributor-logo-div">
+        <img class="distributor-logo" id="distributor-logo" src="" alt="Distributor Logo">
+      </div>
+
+    </div>
+
+    <div class="content-area">
+      <div id="about-csk">
+        <h1 class="heading">About the <b>Cloud Starter Kit</b></h1>
+        <p>The Cloud Starter Kit (or CSK) is a desktop app that can be configured to deploy solutions into
+          a customer's AWS account. It can be used by businesses looking to access an easy-to-use solution that
+          enables them to get started with delivering cloud solutions quickly, without compromising security.
+        </p>
+        <img src="images/main-screen-generic.png" class="csk-screengrab">
+      </div>
+      <div id="create-distributor" hidden>
+        <h1 class="heading">Create Distributor</h1>
+        <p>Creating a Distributor...</p>
+        <div class="record-editor">
+          <form id="create-distributor-form">
+            <table>
+              <tr>
+                <td><label for="distributor-name">Business Name</label></td>
+                <td><input type="text" id="distributor-name" name="BusinessName" placeholder="Lorem Ipsum Distribution"
+                    required pattern="[\w ]{3,}" />
+                </td>
+              </tr>
+              <tr>
+                <td><label for="distributor-logo-url">Logo URL</label></td>
+                <td><textarea id="distributor-logo-url" name="LogoUrl"
+                    placeholder="https://thisisafakeaddress.fake/logo.png"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="distributor-logo-css">Logo CSS</label></td>
+                <td><textarea id="distributor-logo-css" name="LogoCss" placeholder="height: fit-content;"></textarea>
+                </td>
+              </tr>
+              <tr>
+                <td><label for="distributor-file-host">Kit Hub</label></td>
+                <td><input type="text" id="distributor-file-host" name="FileHost" /></td>
+                </td>
+              </tr>
+              <tr>
+                <td><label for="email">Admin Email Address</label></td>
+                <td><input type="email" id="email" name="email" placeholder="" required /></td>
+              </tr>
+            </table>
+            <button type="submit" id="create-distributor-form-submit">Create New Distributor</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="create-customer" hidden>
+        <h1 class="heading">Create CSK for Customer</h1>
+        <p>Creating a CSK for a customer will create their Customer Key, used to unlock the CSK app. It gives us the
+          necessary configuration to display the customer's branding in the app, and allows us to identify when the
+          customer uses the app to deploy Kits.</p>
+        <div class="record-editor">
+          <form id="create-customer-form">
+            <table>
+              <tr>
+                <td><label for="business-name">Business Name</label>
+                  <small>Must be at least 3 characters</small>
+                </td>
+                <td><input type="text" id="business-name" name="BusinessName" placeholder="Lorem Ipsum Industries"
+                    required pattern="[\w ]{3,}" />
+                </td>
+              </tr>
+              <tr>
+                <td><label for="default-region">Default Region</label>
+                  <small>Valid AWS Region identifier, eg ap-southeast-2</small>
+                </td>
+                <td><input type="text" id="default-region" name="DefaultRegion" placeholder="ap-southeast-2" required
+                    pattern="\w{2,}-\w{2,}-\w{1,}" />
+                </td>
+              </tr>
+              <tr>
+                <td><label for="country-code">Three-Letter Country Code</label>
+                  <small>3-letter country code</small>
+                </td>
+                <td><input type="text" id="country-code" name="CountryCode" placeholder="AUS" required
+                    pattern="[A-Z]{3}" /></td>
+              </tr>
+              <tr>
+                <td><label for="preferred-language">Preferred Language</label></td>
+                <td><select id="preferred-language" name="PreferredLanguage" placeholder="en-US">
+                  </select></td>
+              </tr>
+              <tr>
+                <td><label for="logo-url">Logo URL</label><small>Complete URL that returns an image</small></td>
+                <td><textarea id="logo-url" name="LogoUrl"
+                    placeholder="https://cloud-starter-kit.com/images/no-csk-logo.png"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="logo-css-left">Logo CSS Left</label><small>Valid CSS, as you would enter it inline in a
+                    style tag</small></td>
+                <td><textarea id="logo-css-left" name="LogoCssLeft" placeholder="height: fit-content"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="logo-css-right">Logo CSS Right</label>
+                  <small>Valid CSS, as you would enter it inline in a style tag</small>
+                </td>
+                <td><textarea id="logo-css-right" name="LogoCssRight"
+                    placeholder="height: fit-content;width: 250px;margin-bottom: -50px;"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="file-host">Kit Hub</label>
+                  <small>Just the hostname, without the https:// or any trailing paths</small>
+                </td>
+                <td><input type="text" id="file-host" name="FileHost" placeholder="" /></td>
+              </tr>
+              <tr>
+                <td><label for="kit-hub-code">Kit Hub Passcode</label>
+                  <small>At least 8 characters, must contain at least one number and one special character</small>
+                </td>
+                <td><input type="text" id="kit-hub-code" name="KitHubCode"
+                    pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$" /></td>
+              </tr>
+            </table>
+            <button type="submit" id="create-customer-form-submit">Create New Customer</button>
+          </form>
+        </div>
+      </div>
+      <div id="edit-customer" hidden>
+        <h1 class="heading">Edit Customer CSK</h1>
+        <p>The Customer Key is used to unlock the CSK app and cannot be altered. You can modify the other configuration
+          used to display the customer's branding in the app. You may need to load the Customer Key in the CSK app to
+          preview how the customer's logo will appear.</p>
+        <div class="record-editor">
+          <form id="edit-customer-form">
+            <table>
+              <tr>
+                <td><label for="edit-customer-id">Customer Key</label><small>Must be at least 3 characters</small></td>
+                <td><input type="text" id="edit-customer-id" name="csk_id" readonly /></td>
+              </tr>
+              <tr>
+                <td><label for="edit-business-name">Business Name</label></td>
+                <td><input type="text" id="edit-business-name" name="BusinessName" placeholder="Lorem Ipsum Industries"
+                    required pattern="[\w ]{3,}" />
+                </td>
+              </tr>
+              <tr>
+                <td><label for="edit-default-region">Default Region</label><small>Valid AWS Region identifier, eg
+                    ap-southeast-2</small></td>
+                <td><input type="text" id="edit-default-region" name="DefaultRegion" placeholder="ap-southeast-2"
+                    required pattern="\w{2,}-\w{2,}-\w{1,}" />
+                </td>
+              </tr>
+              <tr>
+                <td><label for="edit-country-code">Country Code</label> <small>3-letter country code</small></td>
+                <td><input type="text" id="edit-country-code" name="CountryCode" placeholder="AU" required
+                    pattern="[A-Z]{3}" /></td>
+              </tr>
+              <tr>
+                <td><label for="edit-preferred-language">Preferred Language</label></td>
+                <td><select id="edit-preferred-language" name="PreferredLanguage" placeholder="en-US">
+                  </select></td>
+              </tr>
+              <tr>
+                <td><label for="edit-logo-url">Logo URL</label><small>Complete URL that returns an image</small></td>
+                <td><textarea id="edit-logo-url" name="LogoUrl"
+                    placeholder="https://thisisafakeaddress.fake/logo.png"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="edit-logo-css-left">Logo CSS Left</label><small>Valid CSS, as you would enter it inline
+                    in a
+                    style tag</small></td>
+                <td><textarea id="edit-logo-css-left" name="LogoCssLeft" placeholder="0px"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="edit-logo-css-right">Logo CSS Right</label><small>Valid CSS, as you would enter it
+                    inline in a
+                    style tag</small></td>
+                <td><textarea id="edit-logo-css-right" name="LogoCssRight" placeholder="0px"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="edit-file-host">Kit Hub</label><small>Just the hostname, without the https:// or any
+                    trailing paths</small></td>
+                <td><input type="text" id="edit-file-host" name="FileHost" /></td>
+              </tr>
+              <tr>
+                <td><label for="edit-kit-hub-code">Kit Hub Passcode</label><small>At least 8 characters, must contain at
+                    least one number and one special character</small></td>
+                <td><input type="text" id="edit-kit-hub-code" name="KitHubCode"
+                    pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$" /></td>
+              </tr>
+            </table>
+            <button type="submit" id="edit-customer-form-submit">Update Customer</button>
+          </form>
+        </div>
+      </div>
+      <div id="edit-distributor" hidden>
+        <h1 class="heading">Edit Distributor</h1>
+        <p>You can override the Kit Hub here, as well as set things like the logo that will be displayed in the bottom
+          left corner of the app.</p>
+        <div class="record-editor">
+          <form id="edit-distributor-form">
+            <table>
+              <tr>
+                <td><label for="edit-distributor-id">Distributor ID</label></td>
+                <td><input type="text" id="edit-distributor-id" name="distributor_id" readonly /></td>
+              </tr>
+              <tr>
+                <td><label for="edit-distributor-business-name">Business Name</label></td>
+                <td><input type="text" id="edit-distributor-business-name" name="BusinessName"
+                    placeholder="Lorem Ipsum Distribution" required pattern="[\w ]{3,}" />
+                </td>
+              </tr>
+              <tr>
+                <td><label for="edit-distributor-logo-url">Logo URL</label></td>
+                <td><textarea id="edit-distributor-logo-url" name="LogoUrl"
+                    placeholder="https://thisisafakeaddress.fake/logo.png"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="edit-distributor-logo-css">Logo CSS</label></td>
+                <td><textarea id="edit-distributor-logo-css" name="LogoCss" placeholder="0px"></textarea></td>
+              </tr>
+              <tr>
+                <td><label for="edit-distributor-file-host">Kit Hub</label></td>
+                <td><input type="text" id="edit-distributor-file-host" name="FileHost" /></td>
+              </tr>
+
+            </table>
+            <button type="submit" id="edit-distributor-form-submit">Update Distributor</button>
+          </form>
+        </div>
+      </div>
+      <div id="list-distributors" hidden>
+        <h1 class="heading">List Distributors</h1>
+        <p>Here are the currently setup Distributors. You can edit them as required. </p>
+
+        <div id="distributor-list"></div>
+      </div>
+
+      <div id="list-customers" hidden>
+        <h1 class="heading">List Customer CSKs</h1>
+        <p>Here are the Customer CSKs that are associated with you. You can edit or deactivate them as required. </p>
+        <p class="warning">NOTE: If you deactivate a Customer CSK, that customer will no longer be able to
+          successfully use the CSK App and reporting of activity from that CSK will cease.</p>
+        <div id="customer-list">
+        </div>
+      </div>
+      <div id="reports" hidden>
+        <h1 class="heading">Reports</h1>
+        <p>Coming soon - some stats about your Customer CSKs.</p>
+      </div>
+      <div id="manage-users" hidden>
+        <h1 class="heading">Manage Users</h1>
+        <p>Add a new user to the selected distributor.</p>
+        <div class="record-editor">
+          <form id="add-user-form">
+            <table>
+              <!-- <tr>
+                <td><label for="distributor-id">Distributor ID</label></td>
+                <td><input type="text" id="distributor-id" name="distributor_id" readonly /></td>
+              </tr> -->
+              <tr>
+                <td><label for="new-distributor-user">User Email</label></td>
+                <td><input type="text" id="new-distributor-user" name="email" /></td>
+              </tr>
+            </table>
+            <!-- <button type="submit" id="add-user-form-submit">Add User</button> -->
+          </form>
+        </div>
+        <p>Detach existing users from the selected distributor.</p>
+        <div id="user-list"></div>
+      </div>
+      <div id="config" hidden>
+        <h1 class="heading">Configuration</h1>
+        <p>Here is the config for this distributor.</p>
+        <texarea id="config-data">Coming soon - perhaps.</texarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="general-error-block" class="error-block">
+    <div class="error-block-closable">
+      <div id="hide-errors">
+        <p class="close-x">x</p>
+      </div>
+      <p id="general-errors"></p>
+      <button id="hide-errors-button">Ok</button>
+    </div>
+  </div>
+
+  <div id="general-success-block" class="success-block">
+    <div class="success-block-closable">
+      <div id="hide-success">
+        <p class="close-x">x</p>
+      </div>
+      <p id="general-success"></p>
+      <button id="hide-success-button">Ok</button>
+    </div>
+  </div>
+
+  <div id="loading-block">
+    <img id="loading-block-animation" src="images/grey_loading.gif">
+  </div>
+
+
+  <template id="customer-card-template">
+    <div class="kit">
+      <div class="kit-logo">
+        <img />
+      </div>
+      <div class="kit-details">
+        <h2 class="sub-sub-heading kit-details-heading"></h2>
+        <table>
+          <tr>
+            <td><b>Customer ID:</b></td>
+            <td info="csk-id"></td>
+          </tr>
+          <tr>
+            <td><b>Default Region:</b></td>
+            <td info="default-region"></td>
+          </tr>
+          <tr>
+            <td><b>Country Code:</b></td>
+            <td info="country-code"></td>
+          </tr>
+          <tr>
+            <td><b>Preferred Language:</b></td>
+            <td info="preferred-language"></td>
+          </tr>
+          <tr>
+            <td><b>Logo URL:</b></td>
+            <td info="logo-url"></td>
+          </tr>
+          <tr>
+            <td><b>Logo CSS Left:</b></td>
+            <td info="logo-css-left"></td>
+          </tr>
+          <tr>
+            <td><b>Logo CSS Right:</b></td>
+            <td info="logo-css-right"></td>
+          </tr>
+          <tr>
+            <td><b>Kit Hub:</b></td>
+            <td info="file-host"></td>
+          </tr>
+        </table>
+        <div class="kit-actions">
+          <button class="kit-action-edit" action="edit">Edit</button>
+          <button class="kit-action-deactivate" action="deactivate">Deactivate</button>
+          <button class="kit-action-reactivate" action="reactivate">Reactivate</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="distributor-card-template">
+    <div class="kit">
+      <div class="kit-logo">
+        <img />
+      </div>
+      <div class="kit-details">
+        <h2 class="sub-sub-heading"></h2>
+        <table>
+          <tr>
+            <td><b>Distributor ID:</b></td>
+            <td info="distributor-id"></td>
+          </tr>
+          <tr>
+            <td><b>Logo URL:</b></td>
+            <td info="logo-url"></td>
+          </tr>
+          <tr>
+            <td><b>Logo CSS:</b></td>
+            <td info="logo-css"></td>
+          </tr>
+          <tr>
+            <td><b>Kit Hub:</b></td>
+            <td info="file-host"></td>
+          </tr>
+        </table>
+        <div class="kit-actions">
+          <button class="kit-action-edit" action="edit">Edit</button>
+          <!-- <button class="kit-action-add-user" action="add-user">Add User</button> -->
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="scripts/index.js"></script>
+</body>
+
+</html>

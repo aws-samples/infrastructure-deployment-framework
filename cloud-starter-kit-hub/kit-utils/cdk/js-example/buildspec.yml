@@ -1,0 +1,22 @@
+# buildspec.yml
+# buildspec.yml
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - cd $CODEBUILD_SRC_DIR
+      - pwd
+      - ls -l
+      - npm install aws-cdk -g
+      - npm install
+  build:
+    commands:
+      - pwd
+      - ls -l
+      - cdk bootstrap --termination-protection
+      - cdk deploy --require-approval never
+cache:
+  paths:
+    - "node_modules/**/*"

@@ -1,0 +1,18 @@
+dist-name: वितरक का नाम
+country: देश
+intro-p1: इस ऐप का उपयोग AWS खाते में बुनियादी ढांचे को कॉन्फ़िगर और तैनात करने के लिए किया जा सकता है, जिस तक आपकी पहुंच है।
+intro-p2: यह मानक क्लाउडफॉर्मेशन टेम्पलेट्स को तैनात कर सकता है लेकिन यह सीडीके ऐप्स को बूटस्ट्रैप, कंपोज़ और तैनात कर सकता है और उपयोगी एसडीके कमांड चला सकता है।
+credentials-h2: साख
+credentials-p1: जिस खाते पर आप संचालन करना चाहते हैं, उसके क्रेडेंशियल यहां दर्ज करें।
+credentials-p2:
+  <b>ध्यान दें:</b> <a href='https://aws.amazon.com/blogs/enterprise-strategy/security-at-aws/' target='_blank'>सुरक्षा
+  कार्य शून्य है</a>, इसलिए यह ऐप क्रेडेंशियल संग्रहीत नहीं करता है। हर बार उपयोग करते समय आपको क्रेडेंशियल दर्ज करने की आवश्यकता होगी
+  यह एप। हम अनुशंसा करते हैं कि आप हमेशा अस्थायी क्रेडेंशियल्स और <a
+  href='https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html' target='_blank'>उपयोग न करें
+  दिन-प्रतिदिन के कार्यों के लिए रूट उपयोगकर्ता</a>। कृपया सुनिश्चित करें कि आप <a
+  href='https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html#ru-bp-mfa'
+  target='_blank'>रूट उपयोगकर्ता को MFA से सुरक्षित करें</a>।
+credentials-h3: अस्थायी क्रेडेंशियल (अनुशंसित)
+credentials-p3: आप कर सकते हैं <a target='_blank'
+  href='https://aws.amazon.com/blogs/security/aws-single-sign-on-now-enables-command-line-interface-access-for-aws-accounts-using-corporate-credentials/' >प्राप्त करें
+  IAM पहचान केंद्र से अस्थायी क्रेडेंशियल</a>।

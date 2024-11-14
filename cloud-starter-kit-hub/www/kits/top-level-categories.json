@@ -1,0 +1,38 @@
+[
+    {
+        "Label": "Foundations",
+        "Description": "These kits help you establish good foundations in an AWS Account. They include basic security and compliance tools, cost controls and network setup kits.",
+        "CategoryOrder": [
+            "Security",
+            "Cost Management",
+            "Networking"
+        ]
+    },
+    {
+        "Label": "Basic Components",
+        "Description": "These kits allow you to create core infrastructure components, such as EC2 instances and RDS databases.",
+        "CategoryOrder": [
+            "Virtual Machines",
+            "Databases"
+        ]
+    },
+    {
+        "Label": "Common Patterns",
+        "Description": "These kits solve for common patterns using multiple AWS services.",
+        "CategoryOrder": [
+            "Migration",
+            "Backup",
+            "Identity",
+            "Messaging and Events"
+        ]
+    },
+    {
+        "Label": "Advanced Solutions",
+        "Description": "These advanced solutions cover more complex applications and services, including solutions from third party vendors.",
+        "CategoryOrder": [
+            "Security",
+            "Call Center/Communications",
+            "EUC/VDI Solutions"
+        ]
+    }
+]

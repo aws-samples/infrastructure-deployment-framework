@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; img-src * 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src * node: data: blob: filesystem:;">
+  <link rel="stylesheet" type="text/css" href="css/pico.classless.css">
+  <link rel="stylesheet" type="text/css" href="css/square-jelly-box.css">
+  <link rel="stylesheet" type="text/css" href="css/styleguide.css" />
+  <link rel="stylesheet" type="text/css" href="css/globals.css" />
+  <link rel="stylesheet" type="text/css" href="css/credentials.css" />
+  <link rel="stylesheet" type="text/css" href="css/main-view.css">
+  <link rel="stylesheet" type="text/css" href="css/styles.css">
+  <title>AWS Cloud Starter Kit</title>
+  <script>
+    window.onload = window.api.getHosts((hosts) => {
+      window.hosts = hosts;
+    });
+  </script>
+</head>
+
+<body>
+
+  <div class="container-center-horizontal" id="background-view">
+    <div class="main-view screen">
+      <div class="left-hand-menu">
+        <img class="company-logo-top-left" id="company-logo-left-menu" src="images/placeholder-logo.png">
+        <div class="menu-item">
+          <div class="sub-sub-heading">Current Account</div>
+          <p id="account-display"></p>
+          <p id="account-alias"></p>
+        </div>
+        <div class="menu-item" style="display: none">
+          <div class="blue-text" id="strings-dist-name">Distributor Name</div>
+          <div id="companyName" class="span1 body-base">MyCompany</div>
+        </div>
+        <div class="menu-item" style="display: none">
+          <div class="blue-text" id="strings-country">Country Code</div>
+          <div id="countryCode" class="span1 body-base">Aus</div>
+        </div>
+        <div class="region-selection">
+          <div class="regions-dropdown">
+            <p class="sub-sub-heading">Region</p>
+            <select id="region-select"></select>
+            <img id="region-map" src="images/world_map.svg">
+            <span id="no-vpc-warning" class="warning">No VPC ☁️ </span>
+            <!-- <div id="opt-in">Note: Your default Region has not been opted-into by this account. Use the root user
+              account to <a id="region-optin"
+                href="https://us-east-1.console.aws.amazon.com/billing/home?region=us-east-1#/account"
+                target="_blank"></a>
+            </div> -->
+          </div>
+        </div>
+        <div class="tasks-display">
+          <p id="tasks-display">3 tasks running</p>
+        </div>
+        <div class="left-hand-menu-items">
+          <div id="install-a-kit-button" content="starter-kits" class="left-hand-menu-item">Install a Kit</div>
+          <div id="review-installed-button" content="deployed-stacks" class="left-hand-menu-item">Review Installed Kits
+          </div>
+          <div id="switch-accounts-button" content="credentials-block" class="left-hand-menu-item">Switch Accounts</div>
+        </div>
+
+        <img class="menu-distie-logo" id="menu-distie-logo" src="images/placeholder-logo.png" alt="Distie Logo">
+      </div>
+      <div id="main-content-area" class="content-area flex">
+
+        <div id="starter-kits"></div>
+
+        <div id="deployed-stacks"></div>
+
+        <div id="general-error-block" class="error-block">
+          <div class="error-block-closable">
+            <div id="hide-errors">
+              <p class="close-x">x</p>
+            </div>
+            <p id="general-errors"></p>
+            <button id="hide-errors-button">Ok</button>
+          </div>
+        </div>
+        <!-- this block is not currently used or shown-->
+        <div id="sdk-commands" style="display:none">
+          <p>Example: this button will run an S3 list-buckets SDK command. Any SDK command (or sequence of commands)
+            could
+            be executed here.</p>
+          <p><select id="sdk-commands-list">
+              <option value="list-buckets">List S3 Buckets</option>
+              <option value="list-subnets">List Subnets</option>
+              <option value="get-cloudfront-prefix-list">Get Cloudfront Prefix List</option>
+              <option value="get-credential-report">Get Credential Report</option>
+            </select> <button id="execute-sdk-button">Execute SDK Command</button></p>
+          <div id="sdk-output" class="logs">
+            <h3>Output from SDK</h3>
+            <div class="output" id="sdk-result"></div>
+          </div>
+        </div>
+
+      </div>
+      <div id="right-hand-menu-closed" class="right-hand-menu-closed">
+        <img class="menu-icon-collapsed" src="images/bihelpcircle.svg">
+      </div>
+      <div class="right-hand-menu" id="right-hand-menu">
+        <div class="right-hand-menu-branding">
+          <img class="menu-icon" src="images/black_cloud.svg">
+          <div class="menu-title">Cloud Starter Kit</div>
+        </div>
+        <hr>
+        <div class="sub-heading">About Cloud Starter Kit</div>
+        <p>The Cloud Starter Kit has been developed by AWS in consultation with our Partners as a way to help our
+          customers get started in AWS quickly and efficiently.</p>
+        <p id="strings-intro-p1"></p>
+        <p id="strings-intro-p2"></p>
+        <div class="sub-heading">Help</div>
+        <p>If you need help with this app, you can consult the documentation here.</p>
+        <div class="sub-heading">Troubleshooting</div>
+        <p>If suggested by the support team, you can reload your application configuration by <a href="#"
+            onclick="reloadConfig()">clicking here</a>.</p>
+        <p>You can reset and remove the current application configuration by <a href="#"
+            onclick="purgeConfig()">clicking here</a> - this will require you to enter a key to reopen the app.</p>
+        <p>To reset this account's alias, <a href="#" onclick="resetAlias()">click here</a>. </p>
+        <div class="sub-heading">Feedback</div>
+        <p>Please email your feedback/comments/bug reports <a href="mailto:guymor@amazon.com">here</a>.</p>
+        <div class="sub-heading">Language Support</div>
+        <p>You can change some of the text in the Cloud Starter Kit by choosing a different option here.</p>
+        <div><select id='lang-select'>
+            <option value='en-US'>English</option>
+            <option value='es-ES'>Español</option>
+            <option value='jp-JP'>日本語</option>
+            <option value='in-IN'>हिंदी</option>
+          </select></div>
+        <hr>
+        <p class="footer">This app is using Node.js <span id="node-version"></span>,
+          Chromium <span id="chrome-version"></span> & Electron <span id="electron-version"></span>.<br>
+        </p>
+      </div>
+    </div>
+
+    <div id="credentials-block" class="credentials screen">
+      <div class="overlap-group">
+        <img class="cloud-icon-1" src="images/cloud-icon.svg" alt="Cloud Icon 1" />
+        <h1 class="title title-page">Cloud Starter Kit</h1>
+      </div>
+      <div class="content-area">
+        <img class="logo" id="company-logo-creds" src="images/placeholder-logo.png" alt="Company Logo" />
+        <h3 id="strings-credentials-h2" class="creds heading"></h3>
+        <p id="strings-credentials-p1"></p>
+        <div id="session-error-block">
+          <p id="session-errors"></p>
+        </div>
+        <div class="tab-bar"><button class="tab" id="strings-credentials-h3"></button><button class="tab"
+            id="strings-credentials-h4"></button>
+        </div>
+
+        <div id="temporary-credentials-div" class="creds-tab">
+          <p id="strings-credentials-p3"></p>
+          <textarea id="pasted-credentials" onclick="this.select()" placeholder="export AWS_ACCESS_KEY_ID=ASIA....
+          export AWS_SECRET_ACCESS_KEY=Gv9TzY16Hm9....
+          export AWS_SESSION_....
+        "></textarea>
+        </div>
+
+        <div id="long-lived-credentials-div" class="creds-tab" hidden>
+
+          <p>Using <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html"
+              target="_blank">long-lived
+              credentials is not recommended</a>, so only use them if you cannot generate temporary credentials.
+          </p>
+          <p>
+            <label for="access-key-id">Access Key ID: </label><input class="long-lived-credentials" id="access-key-id"
+              type="text" size="20" placeholder="ASIAZFGZEKEXAMPLE..." pattern="\w+" required><br><label
+              for="secret-access-key">Secret Access Key:
+            </label><input class="long-lived-credentials" id="secret-access-key" type="text" size="40"
+              placeholder="2HiomfHnO5lZe8YWTevkuoL+75+K3exAMPLe..." pattern="\w+" required>
+          </p>
+        </div>
+
+        <div id="credential-error-block">
+          <p id="credential-errors"></p>
+        </div>
+        <p><button id="submit-credentials-button">Submit Credentials</button></p>
+        <p id="enter-different-key"><a href="">Enter a different key</a></p>
+        <p id="strings-credentials-p2" class="creds-security-note"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="lock-block">
+    <img class="cloud-icon-1" src="images/cloud-icon.svg" alt="Cloud Icon" />
+    <p class="title title-page">Cloud Starter Kit</p>
+    <p id="key-error" style="visibility: hidden;">Sorry, that key was not found. Try again.</p>
+    <p><input id="key" placeholder="Enter your key..."> <button id="unlock-button" class="key-lock">Unlock</button></p>
+  </div>
+
+  <div id="modal-block">
+    <div class="modal-message-box">
+      <p id="modal-message">Preparing Region...</p>
+      <p id="modal-details">This may take a few minutes.</p>
+      <img class="modal-block-animation" src="images/white_loading.gif">
+    </div>
+  </div>
+
+  <div id="loading-block">
+    <img id="loading-block-animation" src="images/grey_loading.gif">
+  </div>
+
+  <!-- <script src="./scripts/utilities.js"></script>
+  <script src="./scripts/task-queue.js"></script>
+  <script src="./scripts/stack-monitoring.js"></script>
+  <script src="./scripts/deployments.js"></script>
+  <script src="./scripts/get-amis-and-instance-types.js"></script>
+  <script src="./scripts/sdk-commands.js"></script>
+  <script src="./scripts/renderer.js"></script> -->
+
+  <script src="./scripts/renderer.min.js"></script>
+
+</body>
+
+</html>

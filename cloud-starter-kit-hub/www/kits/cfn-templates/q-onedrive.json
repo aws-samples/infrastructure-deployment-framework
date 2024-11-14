@@ -1,0 +1,365 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Starter-kit for Amazon Q Business",
+    "Metadata": {
+        "License": "Apache-2.0",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "IAM Identity Center"
+                    },
+                    "Parameters": [
+                        "IdentityCenterInstance"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "OneDrive Details"
+                    },
+                    "Parameters": [
+                        "OneDriveClientID",
+                        "OneDriveSecretValue",
+                        "OneDriveTenantID",
+                        "OneDriveUsername"
+                    ]
+                }
+            ]
+        }
+    },
+    "Parameters": {
+        "IdentityCenterInstance": {
+            "Description": "Instance ARN of Identity Center (deployed in Oregon or N. Virginia)",
+            "Type": "String"
+        },
+        "OneDriveClientID": {
+            "NoEcho": true,
+            "Description": "Client ID from your OneDrive.",
+            "Type": "String"
+        },
+        "OneDriveSecretValue": {
+            "NoEcho": true,
+            "Description": "Secret Value from your OneDrive.",
+            "Type": "String"
+        },
+        "OneDriveTenantID": {
+            "Description": "Tenant ID from your OneDrive.",
+            "Type": "String"
+        },
+        "OneDriveUsername": {
+            "Description": "Username/email address from your OneDrive.",
+            "Type": "CommaDelimitedList"
+        }
+    },
+    "Resources": {
+        "QBusinessCommonDataSourceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName": "QBusinessOneDriveServiceRole",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "qbusiness.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "QBusinessDataSourcePolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "secretsmanager:GetSecretValue",
+                                        "secretsmanager:DescribeSecret",
+                                        "secretsmanager:ListSecrets"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DescribeNetworkInterfaces",
+                                        "ec2:CreateNetworkInterface",
+                                        "ec2:DeleteNetworkInterface",
+                                        "ec2:DescribeSubnets",
+                                        "ec2:DescribeSecurityGroups",
+                                        "ec2:DescribeVpcEndpoints",
+                                        "ec2:CreateNetworkInterfacePermission",
+                                        "ec2:ModifyNetworkInterfaceAttribute"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "qbusiness:BatchPutDocument",
+                                        "qbusiness:BatchDeleteDocument",
+                                        "qbusiness:PutGroup",
+                                        "qbusiness:GetGroup",
+                                        "qbusiness:ListGroups",
+                                        "qbusiness:UpdateGroup",
+                                        "qbusiness:DeleteGroup",
+                                        "qbusiness:CreateUser",
+                                        "qbusiness:UpdateUser",
+                                        "qbusiness:DescribeIndex",
+                                        "qbusiness:Query",
+                                        "qbusiness:ListIndices",
+                                        "qbusiness:ListDataSources",
+                                        "qbusiness:DescribeDataSource",
+                                        "qbusiness:StartDataSourceSyncJob",
+                                        "qbusiness:StopDataSourceSyncJob",
+                                        "qbusiness:DeleteDataSource",
+                                        "qbusiness:ListDataSourceSyncJobs"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents",
+                                        "logs:DescribeLogGroups",
+                                        "logs:DescribeLogStreams"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "cloudwatch:PutMetricData"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ListBucket",
+                                        "s3:GetObject",
+                                        "s3:PutObject",
+                                        "s3:DeleteObject",
+                                        "s3:ListBucketVersions",
+                                        "s3:ListBucketMultipartUploads",
+                                        "s3:GetBucketLocation"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:Decrypt",
+                                        "kms:Encrypt",
+                                        "kms:GenerateDataKey",
+                                        "kms:DescribeKey"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "QBusinessApplication": {
+            "Type": "AWS::QBusiness::Application",
+            "Properties": {
+                "Description": "AI Assistant Chat",
+                "DisplayName": "StarterKit-QAssistant",
+                "IdentityCenterInstanceArn": {
+                    "Ref": "IdentityCenterInstance"
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "QBusinessCommonDataSourceRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "QBusinessIndex": {
+            "Type": "AWS::QBusiness::Index",
+            "Properties": {
+                "ApplicationId": {
+                    "Fn::GetAtt": [
+                        "QBusinessApplication",
+                        "ApplicationId"
+                    ]
+                },
+                "CapacityConfiguration": {
+                    "Units": 1
+                },
+                "Description": "String",
+                "DisplayName": "String"
+            }
+        },
+        "QBusinessRetriever": {
+            "Type": "AWS::QBusiness::Retriever",
+            "Properties": {
+                "Type": "NATIVE_INDEX",
+                "ApplicationId": {
+                    "Fn::GetAtt": [
+                        "QBusinessApplication",
+                        "ApplicationId"
+                    ]
+                },
+                "DisplayName": "Retriever",
+                "Configuration": {
+                    "NativeIndexConfiguration": {
+                        "IndexId": {
+                            "Fn::GetAtt": [
+                                "QBusinessIndex",
+                                "IndexId"
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "QBusinessWebExperience": {
+            "Type": "AWS::QBusiness::WebExperience",
+            "DependsOn": "QBusinessApplication",
+            "Properties": {
+                "ApplicationId": {
+                    "Fn::GetAtt": [
+                        "QBusinessApplication",
+                        "ApplicationId"
+                    ]
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "QBusinessCommonDataSourceRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "OneDriveCredentialsSecret": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": "QBusiness-OneDrive-Credentials",
+                "Description": "Secret to store OneDrive client id & secret",
+                "SecretString": {
+                    "Fn::Sub": "{\n    \"clientId\": \"${OneDriveClientID}\",\n    \"clientSecret\": \"${OneDriveSecretValue}\"\n}\n"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "QBusiness-OneDrive-Credentials"
+                    }
+                ]
+            }
+        },
+        "OneDriveDataSource": {
+            "Type": "AWS::QBusiness::DataSource",
+            "Properties": {
+                "ApplicationId": {
+                    "Fn::GetAtt": [
+                        "QBusinessApplication",
+                        "ApplicationId"
+                    ]
+                },
+                "IndexId": {
+                    "Fn::GetAtt": [
+                        "QBusinessIndex",
+                        "IndexId"
+                    ]
+                },
+                "DisplayName": "OneDriveConnector",
+                "Description": "Data Source Connector to OneDrive",
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "QBusinessCommonDataSourceRole",
+                        "Arn"
+                    ]
+                },
+                "SyncSchedule": "cron(0 1 ? * * *)",
+                "Configuration": {
+                    "type": "ONEDRIVEV2",
+                    "syncMode": "FULL_CRAWL",
+                    "secretArn": {
+                        "Ref": "OneDriveCredentialsSecret"
+                    },
+                    "version": "1.0.0",
+                    "enableIdentityCrawler": true,
+                    "connectionConfiguration": {
+                        "repositoryEndpointMetadata": {
+                            "tenantId": {
+                                "Ref": "OneDriveTenantID"
+                            }
+                        }
+                    },
+                    "repositoryConfigurations": {
+                        "file": {
+                            "fieldMappings": [
+                                {
+                                    "dataSourceFieldName": "sourceUrl",
+                                    "indexFieldName": "_source_uri",
+                                    "indexFieldType": "STRING"
+                                },
+                                {
+                                    "dataSourceFieldName": "createdAt",
+                                    "dateFieldFormat": "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                                    "indexFieldName": "_created_at",
+                                    "indexFieldType": "DATE"
+                                },
+                                {
+                                    "dataSourceFieldName": "lastUpdatedAt",
+                                    "dateFieldFormat": "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                                    "indexFieldName": "_last_updated_at",
+                                    "indexFieldType": "DATE"
+                                },
+                                {
+                                    "dataSourceFieldName": "createdBy",
+                                    "indexFieldName": "_authors",
+                                    "indexFieldType": "STRING_LIST"
+                                }
+                            ]
+                        }
+                    },
+                    "additionalProperties": {
+                        "deletionProtectionThreshold": "0",
+                        "enableDeletionProtection": false,
+                        "exclusionFileNamePatterns": [],
+                        "exclusionFilePathPatterns": [],
+                        "exclusionFileTypePatterns": [],
+                        "exclusionOneNotePageNamePatterns": [],
+                        "exclusionOneNoteSectionNamePatterns": [],
+                        "fieldForUserId": "uuid",
+                        "includeSupportedFileType": false,
+                        "inclusionFileNamePatterns": [],
+                        "inclusionFilePathPatterns": [],
+                        "inclusionFileTypePatterns": [],
+                        "inclusionOneNotePageNamePatterns": [],
+                        "inclusionOneNoteSectionNamePatterns": [],
+                        "isUserNameOnS3": true,
+                        "isCrawlAcl": true,
+                        "userFilterPath": "",
+                        "userNameFilter": {
+                            "Ref": "OneDriveUsername"
+                        },
+                        "maxFileSizeInMegaBytes": "50"
+                    }
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "DeployedURL": {
+            "Description": "The endpoint URLs for your Amazon Q Business web experience. The URLs are unique and fully hosted by AWS.",
+            "Value": {
+                "Fn::GetAtt": [
+                    "QBusinessWebExperience",
+                    "DefaultEndpoint"
+                ]
+            }
+        }
+    }
+}
