@@ -1,0 +1,450 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "GitRepoName": {
+            "Type": "String",
+            "Default": "ApplicationSource",
+            "Description": "Name of the Git repository"
+        },
+        "GitPipelineBranch": {
+            "Type": "String",
+            "Default": "main",
+            "Description": "The branch that will trigger a codepipeline build. Codepipeline retrieves source from this build, requires GitRepoName to be set"
+        },
+        "GitPipelineName": {
+            "Type": "String",
+            "Default": "ApplicationPipeline",
+            "Description": "(optional) A codepipeline pipeline to trigger from git, requires GitRepoName and GitPipelineBranch to be set"
+        },
+        "GitUserName": {
+            "Type": "String",
+            "Default": "developer",
+            "AllowedPattern": ".+"
+        },
+        "GitCodeZip": {
+            "Type": "String",
+            "Description": "(optional) Url to zip to populate the git repo"
+        },
+        "GitCodeZipBranch": {
+            "Type": "String",
+            "Description": "The branch to create the intial commit",
+            "Default": "main"
+        },
+        "SourceActionProvider": {
+            "Type": "String",
+            "Default": "git-repository",
+            "AllowedPattern": ".+",
+            "Description": "(optional) Codepipeline source custom action name"
+        },
+        "LatestAmiId": {
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+            "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+        },
+        "VpcId": {
+            "Type": "AWS::EC2::Vpc::Id",
+            "AllowedPattern": ".+",
+            "Description": "VPC where the git instance is launched"
+        },
+        "PublicSubnetId": {
+            "Type": "AWS::EC2::Subnet::Id",
+            "AllowedPattern": ".+",
+            "Description": "Public subnet where the git instance is launched"
+        }
+    },
+    "Resources": {
+        "GitSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable HTTP access",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "GitInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "GitInstanceRole"
+                    }
+                ]
+            }
+        },
+        "GitInstanceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    {
+                        "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+                    }
+                ],
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "codepipeline",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "codepipeline:StartPipelineExecution",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${GitPipelineName}"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "GitBoxInstance": {
+            "Type": "AWS::EC2::Instance",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "config": {
+                        "files": {
+                            "/tmp/app.ini": {
+                                "content": "BRAND_NAME = Training\nRUN_USER   = git\nRUN_MODE   = prod\n\n[database]\nTYPE     = sqlite3\nHOST     = 127.0.0.1:5432\nNAME     = gogs\nSCHEMA   = public\nUSER     = gogs\nPASSWORD =\nSSL_MODE = disable\nPATH     = data/gogs.db\n\n[repository]\nROOT           = /home/git/gogs-repositories\nDEFAULT_BRANCH = main\n\n[server]\nDOMAIN       = ${EC2_PUBLIC_HOSTNAME}\nHTTP_PORT    = 80\nEXTERNAL_URL = http://${EC2_PUBLIC_HOSTNAME}/\nDISABLE_SSH  = true\nOFFLINE_MODE = false\n\n[mailer]\nENABLED = false\n\n[auth]\nREQUIRE_EMAIL_CONFIRMATION  = false\nDISABLE_REGISTRATION        = false\nENABLE_REGISTRATION_CAPTCHA = false\nREQUIRE_SIGNIN_VIEW         = false\n\n[user]\nENABLE_EMAIL_NOTIFICATION = false\n\n[picture]\nDISABLE_GRAVATAR        = false\nENABLE_FEDERATED_AVATAR = false\n\n[session]\nPROVIDER = file\n\n[log]\nMODE      = file\nLEVEL     = Info\nROOT_PATH = /home/git/gogs/log\n\n[security]\nINSTALL_LOCK = true\nSECRET_KEY   = eO1BNKNVkMdxzEe\n"
+                            },
+                            "/tmp/gogs.service": {
+                                "content": "[Unit]\nDescription=Gogs\nAfter=syslog.target\nAfter=network.target\n#After=mariadb.service mysql.service mysqld.service postgresql.service memcached.service redis.service\n\n[Service]\n# Modify these two values and uncomment them if you have\n# repos with lots of files and get an HTTP error 500 because\n# of that\n###\n#LimitMEMLOCK=infinity\n#LimitNOFILE=65535\nType=simple\nUser=git\nGroup=git\nWorkingDirectory=/home/git/gogs\nExecStart=/home/git/gogs/gogs web\nRestart=always\nEnvironment=USER=git HOME=/home/git\n# needed to serve on port 80\nSecureBits=keep-caps\nAmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN\nCapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN\n\n# Some distributions may not support these hardening directives. If you cannot start the service due\n# to an unknown option, comment out the ones not supported by your version of systemd.\nProtectSystem=full\nPrivateDevices=yes\nPrivateTmp=yes\nNoNewPrivileges=true\n\n[Install]\nWantedBy=multi-user.target\n"
+                            },
+                            "/tmp/install.sh": {
+                                "content": "#!/bin/bash -ex\nexport TOKEN=`curl -X PUT \"http://169.254.169.254/latest/api/token\" -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\"`\nexport EC2_PUBLIC_HOSTNAME=`curl -H \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/public-hostname`\n/usr/sbin/useradd -mrU git\ncd /home/git/\n# retrieving installer zip from bucket under the control of curric\nwget https://${GIT_AWS_REGION}-tcprod.s3.amazonaws.com/courses/aws-tc-lab-common-resources/lambda-functions/creategitrepocodepipelineintegration/binaries/gogs_0.13.0_linux_amd64.zip\nunzip gogs_0.13.0_linux_amd64.zip\nmkdir -p gogs/custom/conf\ncat /tmp/app.ini  | envsubst > gogs/custom/conf/app.ini\ncp /tmp/gogs.service /etc/systemd/system/gogs.service\nchown -R git: /home/git/gogs\nsystemctl start gogs\nsystemctl enable gogs\n/usr/sbin/runuser -u git -- gogs/gogs admin create-user --name $GIT_USERNAME --password $GIT_PASSWORD --email ''\n\nif [ -n \"${GIT_REPO_NAME}\" ]; then\n    # wait for webserver to start\n    curl --retry 10 -f --retry-all-errors --retry-delay 2 -s  \"http://localhost\"\n\n    # get an access token\n    ACCESS_TOKEN=$(curl -s -u ${GIT_USERNAME}:${GIT_PASSWORD}  \\\n    --header \"Content-Type: application/json\" \\\n    --request POST http://localhost/api/v1/users/${GIT_USERNAME}/tokens \\\n    --data '{\"name\":\"bootstrap\"}' | jq -r '.sha1')\n\n    # create the repo\n    echo \"Creating repo: ${GIT_REPO_NAME}\"\n    curl -H \"Authorization: token ${ACCESS_TOKEN}\" \\\n    --header \"Content-Type: application/json\" \\\n    --request POST http://localhost/api/v1/user/repos \\\n    --data \"{\\\"name\\\": \\\"${GIT_REPO_NAME}\\\",\\\"description\\\": \\\"\\\",\\\"private\\\": false}\"\n    echo\n\n    if [ -n \"${GIT_PIPELINE_NAME}\" ]; then\n        # copy in the post-receive hook\n        # need to lowercase the path https://github.com/gogs/gogs/blob/v0.13.0/internal/repoutil/repoutil.go#L61\n        echo \"Configuring post-receive hook\"\n        tmpfile=$(mktemp)\n        mkdir -p /home/git/gogs-repositories/${GIT_USERNAME,,}/${GIT_REPO_NAME,,}.git/custom_hooks/\n        cat /tmp/post-receive |  envsubst '$GIT_PIPELINE_BRANCH,$GIT_PIPELINE_NAME'  > $tmpfile\n        chmod +x $tmpfile\n        cp $tmpfile /home/git/gogs-repositories/${GIT_USERNAME,,}/${GIT_REPO_NAME,,}.git/custom_hooks/post-receive\n        chown -R git: /home/git/gogs-repositories/${GIT_USERNAME,,}/${GIT_REPO_NAME,,}.git/custom_hooks\n    fi\n    # if a zip is supplied, unzip it and commit\n    if [ -n \"${GIT_CODE_ZIP}\" ]; then\n        cd /tmp\n        wget ${GIT_CODE_ZIP} -O gitcontents.zip\n        mkdir gitcontents ; cd gitcontents\n        git init\n        git checkout -b ${GIT_CODE_ZIP_BRANCH:-main}\n        unzip ../gitcontents.zip\n        git add .\n        git commit -m \"initial commit\" --author=\"Initial commit <no-reply@example.com>\"\n        git push http://${GIT_USERNAME}:${GIT_PASSWORD}@localhost/${GIT_USERNAME}/${GIT_REPO_NAME}.git ${GIT_CODE_ZIP_BRANCH:-main}\n    fi\nfi\n"
+                            },
+                            "/tmp/post-receive": {
+                                "content": "#!/bin/sh\nwhile read oldrev newrev refname\ndo\n    branch=$(git rev-parse --symbolic --abbrev-ref $refname)\n    if [ \"$GIT_PIPELINE_BRANCH\" = \"$branch\" ]; then\n\n        if aws codepipeline start-pipeline-execution --name $GIT_PIPELINE_NAME  &> /dev/null ; then\n            echo \"Commit received. Initiating $GIT_PIPELINE_NAME pipeline.\"\n        else\n            echo \"Commit received\"\n        fi\n    fi\ndone\n"
+                            }
+                        },
+                        "packages": {
+                            "yum": {
+                                "git": []
+                            }
+                        },
+                        "commands": {
+                            "01_install": {
+                                "command": "bash /tmp/install.sh",
+                                "env": {
+                                    "GIT_AWS_REGION": {
+                                        "Ref": "AWS::Region"
+                                    },
+                                    "GIT_REPO_NAME": {
+                                        "Ref": "GitRepoName"
+                                    },
+                                    "GIT_PIPELINE_BRANCH": {
+                                        "Ref": "GitPipelineBranch"
+                                    },
+                                    "GIT_PIPELINE_NAME": {
+                                        "Ref": "GitPipelineName"
+                                    },
+                                    "GIT_USERNAME": {
+                                        "Ref": "GitUserName"
+                                    },
+                                    "GIT_PASSWORD": {
+                                        "Fn::GetAtt": [
+                                            "LabFusionGitPassword",
+                                            "Outputs.RandomAlphaNumber"
+                                        ]
+                                    },
+                                    "GIT_CODE_ZIP": {
+                                        "Ref": "GitCodeZip"
+                                    },
+                                    "GIT_CODE_ZIP_BRANCH": {
+                                        "Ref": "GitCodeZipBranch"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "GitInstanceProfile"
+                },
+                "InstanceType": "t2.micro",
+                "NetworkInterfaces": [
+                    {
+                        "AssociatePublicIpAddress": "true",
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "PublicSubnetId"
+                        },
+                        "GroupSet": [
+                            {
+                                "Ref": "GitSecurityGroup"
+                            }
+                        ]
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "git-server"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "#!/bin/bash -x\n/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource GitBoxInstance --region ${AWS::Region}\n/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource GitBoxInstance --region ${AWS::Region}\n"
+                    }
+                }
+            },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Timeout": "PT5M"
+                }
+            }
+        },
+        "LabFusionGitPassword": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": {
+                    "Fn::Sub": "https://${AWS::Region}-tcprod.s3.amazonaws.com/courses/aws-tc-lab-common-resources/lambda-functions/generaterandomalphanumeric/yml/generate-random-alpha-number.yml"
+                },
+                "Parameters": {
+                    "PasswordLength": 8,
+                    "ExcludeCharacters": "",
+                    "ExcludeNumbers": "False",
+                    "ExcludePunctuation": "True",
+                    "ExcludeUppercase": "False",
+                    "ExcludeLowercase": "False",
+                    "IncludeSpace": "False",
+                    "RequireEachIncludedType": "True"
+                }
+            }
+        },
+        "LabFusionRandomCustomActionVersion": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": {
+                    "Fn::Sub": "https://${AWS::Region}-tcprod.s3.amazonaws.com/courses/aws-tc-lab-common-resources/lambda-functions/generaterandomalphanumeric/yml/generate-random-alpha-number.yml"
+                },
+                "Parameters": {
+                    "PasswordLength": 4,
+                    "ExcludeCharacters": "",
+                    "ExcludeNumbers": "False",
+                    "ExcludePunctuation": "True",
+                    "ExcludeUppercase": "False",
+                    "ExcludeLowercase": "False",
+                    "IncludeSpace": "False",
+                    "RequireEachIncludedType": "True"
+                }
+            }
+        },
+        "CodePipelineIntegrationLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "ZipFile": "\"Lambda function for CodePipeline integration\"\nimport os\nimport subprocess\nimport tempfile\nfrom time import sleep\n\nimport boto3\n\ndef git_failure(client, job_id, result):\n    \"Fail the action if there are any git failures\"\n    print(\"An error occured in:\" + \" \".join(result.args))\n    print(\"-\" * 80)\n    print(\"stderr: \", result.stderr.decode('utf-8'))\n    print(\"-\" * 80)\n    print(\"stdout: \", result.stdout.decode('utf-8'))\n    print(\"-\" * 80)\n\n    client.put_job_failure_result(\n        jobId=job_id,\n        failureDetails={\n            'type': 'ConfigurationError',\n            'message': 'Possible empty repo or misconfiguration'\n        }\n    )\n    return False\n\ndef lambda_handler(event, context):\n    \"Load any pending source jobs and package source\"\n    client = boto3.client('codepipeline')\n\n    # eventual consistency problem - we get the event saying the pipeline is executing\n    # but sometimes the poll_for_jobs still shows zero jobs\n    attempt = 0\n    while attempt < 10:\n        # provider needs to be a parameter\n        jobs = client.poll_for_jobs(actionTypeId={\n            'category': 'Source',\n            'owner': 'Custom',\n            'provider': os.getenv(\"SOURCE_ACTION_PROVIDER\"),\n            'version': os.getenv(\"SOURCE_ACTION_VERSION\")})\n        sleep(1)\n        print(f\"Attempt {attempt}: Jobs count {len(jobs['jobs'])}\")\n        attempt += 1\n        if jobs['jobs']:\n            break\n\n    for job in jobs[\"jobs\"]:\n        job_id = job[\"id\"]\n        job_nonce = job[\"nonce\"]\n        bucket_name = job[\"data\"][\"outputArtifacts\"][0][\"location\"][\"s3Location\"][\"bucketName\"]\n        object_key = job[\"data\"][\"outputArtifacts\"][0][\"location\"][\"s3Location\"][\"objectKey\"]\n        access_key_id = job[\"data\"][\"artifactCredentials\"][\"accessKeyId\"]\n        secret_access_key = job[\"data\"][\"artifactCredentials\"][\"secretAccessKey\"]\n        session_token = job[\"data\"][\"artifactCredentials\"][\"sessionToken\"]\n\n        client.acknowledge_job(\n            jobId=job_id,\n            nonce=job_nonce\n        )\n\n        with tempfile.TemporaryDirectory() as tmpdirname:\n            # Define the Git repository URL\n            repo_url = os.getenv(\"GIT_REPO_PATH\")\n            repo_branch = os.getenv(\"GIT_PIPELINE_BRANCH\")\n\n            # Run the git clone command\n            print(f\"Cloning from git to: {tmpdirname}\")\n            result = subprocess.run(\n                [\"git\", \"clone\", \"--single-branch\", \"--branch\", repo_branch, repo_url, tmpdirname],\n                stdout=subprocess.PIPE,\n                stderr=subprocess.PIPE,\n                check=False,\n                cwd=\"/tmp\"\n            )\n            if result.returncode != 0:\n                return git_failure(client, job_id, result)\n\n            print(\"Retrieving commit detalis\")\n            result = subprocess.run(\n                [\"git\", \"rev-list\", \"--format=oneline\", \"--max-count=1\", \"HEAD\"],\n                stdout=subprocess.PIPE,\n                stderr=subprocess.PIPE,\n                check=False,\n                cwd=tmpdirname\n            )\n            if result.returncode != 0:\n                return git_failure(client, job_id, result)\n\n            infos = result.stdout.decode('utf-8').split(\" \", 1)\n            commit, message = infos[0], infos[1].strip()\n\n            print(\"Building Zip file\")\n            result = subprocess.run(\n                [\"git\", \"archive\", \"-o\", \"git.zip\", \"HEAD\"],\n                stdout=subprocess.PIPE,\n                stderr=subprocess.PIPE,\n                check=False,\n                cwd=tmpdirname\n            )\n            if result.returncode != 0:\n                return git_failure(client, job_id, result)\n\n            # send zip to s3\n            zip_file_path = os.path.join(tmpdirname, \"git.zip\")\n            print(f\"Sending {zip_file_path} to {bucket_name}/{object_key}\")\n            s3 = boto3.client('s3',\n                            aws_access_key_id=access_key_id,\n                            aws_secret_access_key=secret_access_key,\n                            aws_session_token=session_token)\n            s3.upload_file(zip_file_path,\n                        bucket_name,\n                        object_key,\n                        ExtraArgs={'ServerSideEncryption':'aws:kms'})\n\n        client.put_job_success_result(\n            jobId=job_id,\n            currentRevision={\n                'revision': commit,\n                'changeIdentifier': message,  # pipeline doesn't appear to do anything with this?\n                'revisionSummary': message\n            }\n        )\n    return True\n"
+                },
+                "Layers": [
+                    {
+                        "Fn::Sub": "arn:aws:lambda:${AWS::Region}:553035198032:layer:git-lambda2:8"
+                    }
+                ],
+                "Handler": "index.lambda_handler",
+                "Runtime": "python3.12",
+                "Environment": {
+                    "Variables": {
+                        "GIT_REPO_PATH": {
+                            "Fn::Sub": "http://${GitBoxInstance.PublicDnsName}/${GitUserName}/${GitRepoName}.git"
+                        },
+                        "GIT_PIPELINE_BRANCH": {
+                            "Ref": "GitPipelineBranch"
+                        },
+                        "SOURCE_ACTION_PROVIDER": {
+                            "Ref": "SourceActionProvider"
+                        },
+                        "SOURCE_ACTION_VERSION": {
+                            "Fn::GetAtt": [
+                                "LabFusionRandomCustomActionVersion",
+                                "Outputs.RandomAlphaNumber"
+                            ]
+                        }
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "CodePipelineIntegrationLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "MemorySize": 128,
+                "Timeout": 300
+            }
+        },
+        "CodePipelineIntegrationLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                    "arn:aws:iam::aws:policy/AWSCodePipelineCustomActionAccess"
+                ]
+            }
+        },
+        "CustomSourceAction": {
+            "Type": "AWS::CodePipeline::CustomActionType",
+            "Properties": {
+                "Category": "Source",
+                "Provider": {
+                    "Ref": "SourceActionProvider"
+                },
+                "Version": {
+                    "Fn::GetAtt": [
+                        "LabFusionRandomCustomActionVersion",
+                        "Outputs.RandomAlphaNumber"
+                    ]
+                },
+                "Settings": {
+                    "RevisionUrlTemplate": {
+                        "Fn::Sub": "http://${GitBoxInstance.PublicDnsName}/${GitUserName}/${GitRepoName}/commit/{RevisionId}"
+                    }
+                },
+                "InputArtifactDetails": {
+                    "MaximumCount": 0,
+                    "MinimumCount": 0
+                },
+                "OutputArtifactDetails": {
+                    "MaximumCount": 1,
+                    "MinimumCount": 1
+                }
+            }
+        },
+        "CodePipelineCustomActionFunctionPermissions": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "CodePipelineIntegrationLambda",
+                        "Arn"
+                    ]
+                },
+                "Principal": "events.amazonaws.com"
+            }
+        },
+        "CodePipelineCustomActionTrigger": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "State": "ENABLED",
+                "Description": {
+                    "Fn::Sub": "Handles the ${SourceActionProvider} custom provider for CodePipeline."
+                },
+                "EventPattern": {
+                    "source": [
+                        "aws.codepipeline"
+                    ],
+                    "detail-type": [
+                        "CodePipeline Action Execution State Change"
+                    ],
+                    "detail": {
+                        "type": {
+                            "provider": [
+                                {
+                                    "Fn::Sub": "${SourceActionProvider}"
+                                }
+                            ],
+                            "category": [
+                                "Source"
+                            ],
+                            "owner": [
+                                "Custom"
+                            ]
+                        },
+                        "state": [
+                            "STARTED"
+                        ]
+                    }
+                },
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "CodePipelineIntegrationLambda",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "CodePipelineIntegrationLambda"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "GitUserName": {
+            "Value": {
+                "Ref": "GitUserName"
+            }
+        },
+        "GitPassword": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "LabFusionGitPassword",
+                    "Outputs.RandomAlphaNumber"
+                ]
+            }
+        },
+        "GitUrl": {
+            "Value": {
+                "Fn::Sub": "http://${GitBoxInstance.PublicDnsName}/"
+            }
+        },
+        "GitCloneUrl": {
+            "Value": {
+                "Fn::Sub": "http://${GitBoxInstance.PublicDnsName}/${GitUserName}/${GitRepoName}.git"
+            }
+        }
+    }
+}

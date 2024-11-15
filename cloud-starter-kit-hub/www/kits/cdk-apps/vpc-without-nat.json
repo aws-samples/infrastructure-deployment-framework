@@ -1,0 +1,39 @@
+{
+    "ConfigFile": "parameters.json",
+    "Parameters": {
+        "addSecretsManagerEndpoint": {
+            "Label": "VPC Interface Endpoint for Secrets Manager",
+            "Description": "This allows requests to Secrets Manager from private subnets.",
+            "AllowedValues": [
+                "Yes",
+                "No"
+            ],
+            "Default": "No"
+        },
+        "addSsmEndpoints": {
+            "Label": "VPC Interface Endpoints for Systems Manager Session Manager",
+            "Description": "This allows you to use Session Manager to connect to instances in private subnets instead of a bastion host.",
+            "AllowedValues": [
+                "Yes",
+                "No"
+            ],
+            "Default": "No"
+        }
+    },
+    "Tags": {},
+    "Stacks": [
+        {
+            "name": "csk-vpc-without-nat-stack",
+            "resourceCount": 28,
+            "hasOutputs": false
+        }
+    ],
+    "FileList": [
+        "vpc-without-nat/bin/vpc-without-nat.js",
+        "vpc-without-nat/lib/vpc-without-nat.js",
+        "vpc-without-nat/buildspec.yml",
+        "vpc-without-nat/cdk.json",
+        "vpc-without-nat/package.json",
+        "vpc-without-nat/parameters-template.json"
+    ]
+}

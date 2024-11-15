@@ -1,0 +1,39 @@
+{
+    "ConfigFile": "parameters.json",
+    "Parameters": {
+        "queueName": {
+            "Label": "Queue Name",
+            "Description": "A unique identifier for this queue - must contain between 3 and 50 alphanumeric characters, hyphens and underscores",
+            "Type": "String",
+            "Default": "my-queue",
+            "AllowedPattern": "^[a-zA-Z0-9_\\-]{3,50}$"
+        },
+        "fifo": {
+            "Label": "FIFO Queue",
+            "Description": "Should this be a FIFO queue?",
+            "AllowedValues": [
+                true,
+                false
+            ],
+            "Default": false,
+            "CheckboxLabel": "Make FIFO Queue"
+        }
+    },
+    "Tags": {},
+    "Stacks": [
+        {
+            "name": "queue-stack",
+            "resourceCount": 6,
+            "hasOutputs": true
+        }
+    ],
+    "FileList": [
+        "queue/bin/queue.ts",
+        "queue/lib/queue-stack.ts",
+        "queue/buildspec.yml",
+        "queue/cdk.json",
+        "queue/package.json",
+        "queue/tsconfig.json",
+        "queue/parameters-template.json"
+    ]
+}

@@ -1,0 +1,150 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Starter-kit for AWS WAF",
+    "Metadata": {
+        "License": "Apache-2.0",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "WAF Configuration"
+                    },
+                    "Parameters": [
+                        "WebACLName",
+                        "EndpointType",
+                        "ActivateAWSManagedRulesParam",
+                        "ActivateReputationListsProtectionParam"
+                    ]
+                }
+            ]
+        }
+    },
+    "Parameters": {
+        "WebACLName": {
+            "Description": "Identify this Web ACL with a name (eg. webACL-customerName-webapp1)",
+            "Type": "String",
+            "Default": "WebACL-WebApp1"
+        },
+        "EndpointType": {
+            "Description": "Select 'REGIONAL' for ALB/ELB/API Gateway endpoints and 'CLOUDFRONT' if Cloudfront is the endpoint",
+            "Type": "String",
+            "AllowedValues": [
+                "CLOUDFRONT",
+                "REGIONAL"
+            ],
+            "Default": "REGIONAL"
+        },
+        "ActivateAWSManagedRulesParam": {
+            "Description": "Choose yes to enable AWS Managed Rules",
+            "Type": "String",
+            "AllowedValues": [
+                true,
+                false
+            ],
+            "Default": true
+        },
+        "ActivateReputationListsProtectionParam": {
+            "Description": "Choose yes to block requests from IP addresses on third-party reputation lists (supported lists - spamhaus, torproject, and emerging threats)",
+            "Type": "String",
+            "AllowedValues": [
+                true,
+                false
+            ],
+            "Default": true
+        }
+    },
+    "Conditions": {
+        "AWSManagedCommonRulesActivated": {
+            "Fn::Equals": [
+                {
+                    "Ref": "ActivateAWSManagedRulesParam"
+                },
+                true
+            ]
+        },
+        "ReputationListsProtectionActivated": {
+            "Fn::Equals": [
+                {
+                    "Ref": "ActivateReputationListsProtectionParam"
+                },
+                true
+            ]
+        }
+    },
+    "Resources": {
+        "WAFWebACL": {
+            "Type": "AWS::WAFv2::WebACL",
+            "Properties": {
+                "Name": {
+                    "Ref": "WebACLName"
+                },
+                "Description": "Custom WAFWebACL",
+                "Scope": {
+                    "Ref": "EndpointType"
+                },
+                "VisibilityConfig": {
+                    "SampledRequestsEnabled": true,
+                    "CloudWatchMetricsEnabled": true,
+                    "MetricName": "WAFWebACLMetrics"
+                },
+                "DefaultAction": {
+                    "Allow": {}
+                },
+                "Rules": [
+                    {
+                        "Fn::If": [
+                            "AWSManagedCommonRulesActivated",
+                            {
+                                "Name": "AWS-AWSManagedRulesCommonRuleSet",
+                                "Priority": 0,
+                                "OverrideAction": {
+                                    "None": {}
+                                },
+                                "VisibilityConfig": {
+                                    "SampledRequestsEnabled": true,
+                                    "CloudWatchMetricsEnabled": true,
+                                    "MetricName": "RuleWithAWSManagedRulesMetric"
+                                },
+                                "Statement": {
+                                    "ManagedRuleGroupStatement": {
+                                        "VendorName": "AWS",
+                                        "Name": "AWSManagedRulesCommonRuleSet"
+                                    }
+                                }
+                            },
+                            {
+                                "Ref": "AWS::NoValue"
+                            }
+                        ]
+                    },
+                    {
+                        "Fn::If": [
+                            "ReputationListsProtectionActivated",
+                            {
+                                "Name": "AWS-AWSManagedRulesAmazonIpReputationList",
+                                "Priority": 1,
+                                "OverrideAction": {
+                                    "None": {}
+                                },
+                                "VisibilityConfig": {
+                                    "SampledRequestsEnabled": true,
+                                    "CloudWatchMetricsEnabled": true,
+                                    "MetricName": "RuleWithAWSManagedRulesMetric"
+                                },
+                                "Statement": {
+                                    "ManagedRuleGroupStatement": {
+                                        "VendorName": "AWS",
+                                        "Name": "AWSManagedRulesAmazonIpReputationList"
+                                    }
+                                }
+                            },
+                            {
+                                "Ref": "AWS::NoValue"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+}

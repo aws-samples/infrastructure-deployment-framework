@@ -1,0 +1,97 @@
+{
+  "Catalogue": [
+    {
+      "TopLevelCategory": "Foundations",
+      "Category": "Networking",
+      "Description": "These kits help you establish good foundations in an AWS Account. They include basic security and compliance tools, cost controls and network setup.",
+      "Kits": [
+        {
+          "Name": "VPC with NAT",
+          "Manifest": "vpc-with-nat.json",
+          "Description": "This stack creates and Amazon VPC (Virtual Private Cloud) in the target account. A VPC is a pre-requisite for a range of other services you may want to create in this account, eg EC2 instances must be created in a VPC.<br>This VPC will create 3 public subnets and 3 private subnets. The public subnets will be accessible from the Internet via an Internet Gateway.<br>NAT Gateways enable outbound access to the Internet from the private subnets - add more than one to have multi-AZ resilience for NAT. ",
+          "CostCalculator": "https://calculator.aws/#/estimate?id=8959e91d8c49f6c9ac695cb2dce398b032c4169b",
+          "Copyright": "© Guy Morton 2024",
+          "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+        },
+        {
+          "Name": "VPC without NAT",
+          "Manifest": "vpc-without-nat.json",
+          "Description": "This stack creates and Amazon VPC (Virtual Private Cloud) in the target account. A VPC is a pre-requisite for a range of other services you may want to create in this account, eg EC2 instances must be created in a VPC.<br>This VPC will create 3 public subnets and 3 private subnets. The public subnets will be accessible from the Internet via an Internet Gateway.",
+          "CostCalculator": "https://calculator.aws/#/estimate?id=f5d27ea6e30b72437f63c27338f9315e3fd3a36e",
+          "Copyright": "© Guy Morton 2024",
+          "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+        }
+      ]
+    },
+    {
+      "TopLevelCategory": "Basic Components",
+      "Category": "Virtual Machines",
+      "Kits": [
+        {
+          "Name": "Single EC2 instance",
+          "Description": "A kit to create a single server instance. Each unique server name you specify will be created in its own CloudFormation stack. You can create instances using either x86 or Arm processors, with Windows, Amazon Linux or Ubuntu AWS-managed AMIs. You can customise the Userdata that will be run when the instance is brought online - by default the supplied script will install a web server as well as utilities to enable the instance to be accessed via the AWS console.",
+          "Manifest": "ec2.json",
+          "AllowUpdates": false,
+          "Copyright": "© Guy Morton 2024",
+          "MoreInfo": "<img style='width:300px' target='_blank' src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>Here is some more info and a <a href='https://aws.amazon.com/'>Link</a>"
+        }
+      ]
+    },
+    {
+      "TopLevelCategory": "Basic Components",
+      "Category": "Virtual Machines",
+      "Kits": [
+        {
+          "Name": "EC2 Auto Scaling Group with DNS hostname",
+          "Description": "This kit creates an auto scaling group of EC2 instances and an Application Load Balancer with a DNS hostname and TLS certificate. Each unique server name you specify will be created in its own CloudFormation stack. You can create instances using either x86 or Arm processors, with Windows, Amazon Linux or Ubuntu AWS-managed AMIs. You can customise the Userdata that will be run when the instance is brought online - by default the supplied script will install a web server as well as utilities to enable the instance to be accessed via the AWS console.",
+          "Manifest": "ec2-asg-dns.json",
+          "AllowUpdates": false,
+          "Copyright": "© Guy Morton 2024",
+          "MoreInfo": "<img style='width:300px' target='_blank' src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>Here is some more info and a <a href='https://aws.amazon.com/'>Link</a>"
+        }
+      ]
+    },
+    {
+      "TopLevelCategory": "Basic Components",
+      "Category": "Databases",
+      "Kits": [
+        {
+          "Name": "MySQL Server",
+          "Description": "A kit to create a MySQL Database in the target account.",
+          "Manifest": "mysql.json",
+          "AllowUpdates": false,
+          "DbEngineFilter": "mysql",
+          "Copyright": "© Guy Morton 2024",
+          "MoreInfo": "<img style='width:300px' target='_blank' src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>Here is some more info and a <a href='https://aws.amazon.com/'>Link</a>"
+        }
+      ]
+    },
+    {
+      "TopLevelCategory": "Common Patterns",
+      "Category": "Messaging and Events",
+      "Kits": [
+        {
+          "Name": "Simple Queue",
+          "Description": "If you need to start out with message queues and notifications, the kits you need are here.",
+          "Manifest": "queue.json",
+          "Copyright": "",
+          "MoreInfo": ""
+        }
+      ]
+    },
+    {
+      "TopLevelCategory": "Foundations",
+      "Category": "Backup",
+      "Kits": [
+        {
+          "Name": "AWS Backup",
+          "Description": "This kit creates a AWS Backup Vault and sets up backup plans that will automatically back up resources you tag in your account. It offers 6 different backup plans that can be applied to resources in your account based on Tags.",
+          "Manifest": "backup.json",
+          "AllowUpdates": true,
+          "Copyright": "",
+          "MoreInfo": ""
+        }
+      ]
+    }
+  ]
+}

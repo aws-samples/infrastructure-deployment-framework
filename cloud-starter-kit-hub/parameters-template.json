@@ -1,0 +1,13 @@
+{
+    "hosted_zone": "",
+    "hosted_zone_id": "",
+    "environment": "",
+    "kvs_data": {
+        "data": [
+            {
+                "key": "x-access-control",
+                "value": "none"
+            }
+        ]
+    }
+}

@@ -1,0 +1,18 @@
+dist-name: Nombre del distribuidor
+country: País
+intro-p1: Esta aplicación se puede utilizar para configurar e implementar infraestructura en una cuenta de AWS a la que tenga acceso.
+intro-p2: Puede implementar plantillas estándar de CloudFormation, pero también puede iniciar, componer e implementar aplicaciones CDK y ejecutar comandos SDK útiles.
+credentials-h2: Cartas credenciales
+credentials-p1: Ingrese aquí las credenciales de la cuenta que desea operar.
+credentials-p2:
+  <b>Nota:</b> <a href=https://aws.amazon.com/blogs/enterprise-strategy/security-at-aws/ target=_blank>Seguridad
+  es el trabajo cero</a>, por lo que esta aplicación no almacena credenciales. Deberá ingresar las credenciales cada vez que use
+  Esta aplicación. Le recomendamos utilizar siempre credenciales temporales y <a
+  href=https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html target=_blank>no utilizar
+  el usuario root para las operaciones diarias</a>. Por favor asegúrese de <a
+  href=https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html#ru-bp-mfa
+  target=_blank>proteger al usuario root con MFA</a>.
+credentials-h3: Credenciales Temporales (Recomendado)
+credentials-p3: Puedes <a target="_blank"
+  href="https://aws.amazon.com/blogs/security/aws-single-sign-on-now-enables-command-line-interface-access-for-aws-accounts-using-corporate-credentials/" >obtener
+  credenciales temporales</a> de IAM Identity Center.

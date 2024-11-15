@@ -1,0 +1,876 @@
+{
+    "Description": "Management & Governance tools",
+    "Parameters": {
+        "EnableConfig": {
+            "Type": "String",
+            "Default": "yes",
+            "AllowedValues": [
+                "yes",
+                "no"
+            ],
+            "Description": "Enable AWS Config"
+        },
+        "EnableCloudTrail": {
+            "Type": "String",
+            "Default": "yes",
+            "AllowedValues": [
+                "yes",
+                "no"
+            ],
+            "Description": "Enable AWS CloudTrail"
+        },
+        "EnableGuardDuty": {
+            "Type": "String",
+            "Default": "yes",
+            "AllowedValues": [
+                "yes",
+                "no"
+            ],
+            "Description": "Enable Amazon GuardDuty & Security Hub"
+        }
+    },
+    "Conditions": {
+        "ShouldCreateCloudTrailCondition": {
+            "Fn::Equals": [
+                {
+                    "Ref": "EnableCloudTrail"
+                },
+                "yes"
+            ]
+        },
+        "ShouldCreateConfigCondition": {
+            "Fn::Equals": [
+                {
+                    "Ref": "EnableConfig"
+                },
+                "yes"
+            ]
+        },
+        "ShouldCreateConfigOrCloudTrailCondition": {
+            "Fn::Or": [
+                {
+                    "Condition": "ShouldCreateConfigCondition"
+                },
+                {
+                    "Condition": "ShouldCreateCloudTrailCondition"
+                }
+            ]
+        },
+        "ShouldCreateGuardDutyCondition": {
+            "Fn::Equals": [
+                {
+                    "Ref": "EnableGuardDuty"
+                },
+                "yes"
+            ]
+        }
+    },
+    "Resources": {
+        "AdminKeyC19094DA": {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "KeyPolicy": {
+                    "Statement": [
+                        {
+                            "Action": "kms:*",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:iam::",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":root"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "Resource": "*"
+                        },
+                        {
+                            "Action": [
+                                "kms:Decrypt",
+                                "kms:Encrypt",
+                                "kms:GenerateDataKey*",
+                                "kms:ReEncrypt*"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "cloudtrail.amazonaws.com",
+                                    "config.amazonaws.com"
+                                ]
+                            },
+                            "Resource": "*"
+                        },
+                        {
+                            "Action": "kms:Decrypt",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:iam::",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":root"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "Resource": "*"
+                        },
+                        {
+                            "Action": [
+                                "kms:Decrypt*",
+                                "kms:Describe*",
+                                "kms:Encrypt*",
+                                "kms:GenerateDataKey*",
+                                "kms:ReEncrypt*"
+                            ],
+                            "Condition": {
+                                "ArnLike": {
+                                    "kms:EncryptionContext:aws:logs:arn": {
+                                        "Fn::Join": [
+                                            ":",
+                                            [
+                                                "arn:aws:logs",
+                                                {
+                                                    "Ref": "AWS::Region"
+                                                },
+                                                {
+                                                    "Ref": "AWS::AccountId"
+                                                },
+                                                "*"
+                                            ]
+                                        ]
+                                    }
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": {
+                                    "Fn::Join": [
+                                        ".",
+                                        [
+                                            "logs",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "amazonaws.com"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "Resource": "*"
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Description": "Admin KMS key for admin data",
+                "EnableKeyRotation": true,
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "UpdateReplacePolicy": "Retain",
+            "DeletionPolicy": "Retain",
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/AdminKey/Resource"
+            },
+            "Condition": "ShouldCreateConfigOrCloudTrailCondition"
+        },
+        "AdminKeyAlias69FF3076": {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": "alias/admin-data-key",
+                "TargetKeyId": {
+                    "Fn::GetAtt": [
+                        "AdminKeyC19094DA",
+                        "Arn"
+                    ]
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/AdminKey/Alias/Resource"
+            },
+            "Condition": "ShouldCreateConfigOrCloudTrailCondition"
+        },
+        "AccessLogsBucket83982689": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "SSEAlgorithm": "AES256"
+                            }
+                        }
+                    ]
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                },
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "UpdateReplacePolicy": "Retain",
+            "DeletionPolicy": "Retain",
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/AccessLogsBucket/Resource"
+            },
+            "Condition": "ShouldCreateConfigOrCloudTrailCondition"
+        },
+        "AccessLogsBucketPolicy7F77476F": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "AccessLogsBucket83982689"
+                },
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "s3:PutObject",
+                            "Condition": {
+                                "ArnLike": {
+                                    "aws:SourceArn": {
+                                        "Fn::GetAtt": [
+                                            "CloudTrailBucket98B0BFE1",
+                                            "Arn"
+                                        ]
+                                    }
+                                },
+                                "StringEquals": {
+                                    "aws:SourceAccount": {
+                                        "Ref": "AWS::AccountId"
+                                    }
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "logging.s3.amazonaws.com"
+                            },
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "AccessLogsBucket83982689",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "/cloudtrail*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Action": "s3:PutObject",
+                            "Condition": {
+                                "ArnLike": {
+                                    "aws:SourceArn": {
+                                        "Fn::GetAtt": [
+                                            "ConfigBucket2112C5EC",
+                                            "Arn"
+                                        ]
+                                    }
+                                },
+                                "StringEquals": {
+                                    "aws:SourceAccount": {
+                                        "Ref": "AWS::AccountId"
+                                    }
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "logging.s3.amazonaws.com"
+                            },
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "AccessLogsBucket83982689",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "/config*"
+                                    ]
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/AccessLogsBucket/Policy/Resource"
+            },
+            "Condition": "ShouldCreateConfigOrCloudTrailCondition"
+        },
+        "CloudTrailBucket98B0BFE1": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "KMSMasterKeyID": {
+                                    "Fn::GetAtt": [
+                                        "AdminKeyC19094DA",
+                                        "Arn"
+                                    ]
+                                },
+                                "SSEAlgorithm": "aws:kms"
+                            }
+                        }
+                    ]
+                },
+                "LifecycleConfiguration": {
+                    "Rules": [
+                        {
+                            "ExpirationInDays": 3650,
+                            "Id": "Delete",
+                            "Status": "Enabled"
+                        }
+                    ]
+                },
+                "LoggingConfiguration": {
+                    "DestinationBucketName": {
+                        "Ref": "AccessLogsBucket83982689"
+                    },
+                    "LogFilePrefix": "cloudtrail"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                },
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ],
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                }
+            },
+            "UpdateReplacePolicy": "Retain",
+            "DeletionPolicy": "Retain",
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/CloudTrailBucket/Resource"
+            },
+            "Condition": "ShouldCreateCloudTrailCondition"
+        },
+        "CloudTrailBucketPolicy2A856177": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "CloudTrailBucket98B0BFE1"
+                },
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "s3:GetBucketAcl",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Resource": {
+                                "Fn::GetAtt": [
+                                    "CloudTrailBucket98B0BFE1",
+                                    "Arn"
+                                ]
+                            }
+                        },
+                        {
+                            "Action": "s3:PutObject",
+                            "Condition": {
+                                "StringEquals": {
+                                    "s3:x-amz-acl": "bucket-owner-full-control"
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "CloudTrailBucket98B0BFE1",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "/AWSLogs/",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/CloudTrailBucket/Policy/Resource"
+            },
+            "Condition": "ShouldCreateCloudTrailCondition"
+        },
+        "CloudTrailLogGroup343A29D6": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "KmsKeyId": {
+                    "Fn::GetAtt": [
+                        "AdminKeyC19094DA",
+                        "Arn"
+                    ]
+                },
+                "RetentionInDays": 731,
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "UpdateReplacePolicy": "Retain",
+            "DeletionPolicy": "Retain",
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/CloudTrailLogGroup/Resource"
+            },
+            "Condition": "ShouldCreateCloudTrailCondition"
+        },
+        "CloudTrailLogsRole9F6E6663": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/CloudTrail/LogsRole/Resource"
+            },
+            "Condition": "ShouldCreateCloudTrailCondition"
+        },
+        "CloudTrailLogsRoleDefaultPolicyD9019B15": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": {
+                                "Fn::GetAtt": [
+                                    "CloudTrailLogGroup343A29D6",
+                                    "Arn"
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "PolicyName": "CloudTrailLogsRoleDefaultPolicyD9019B15",
+                "Roles": [
+                    {
+                        "Ref": "CloudTrailLogsRole9F6E6663"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/CloudTrail/LogsRole/DefaultPolicy/Resource"
+            },
+            "Condition": "ShouldCreateCloudTrailCondition"
+        },
+        "CloudTrailA62D711D": {
+            "Type": "AWS::CloudTrail::Trail",
+            "Properties": {
+                "IsLogging": true,
+                "S3BucketName": {
+                    "Ref": "CloudTrailBucket98B0BFE1"
+                },
+                "CloudWatchLogsLogGroupArn": {
+                    "Fn::GetAtt": [
+                        "CloudTrailLogGroup343A29D6",
+                        "Arn"
+                    ]
+                },
+                "CloudWatchLogsRoleArn": {
+                    "Fn::GetAtt": [
+                        "CloudTrailLogsRole9F6E6663",
+                        "Arn"
+                    ]
+                },
+                "EnableLogFileValidation": true,
+                "EventSelectors": [],
+                "IncludeGlobalServiceEvents": true,
+                "IsMultiRegionTrail": true,
+                "KMSKeyId": {
+                    "Fn::GetAtt": [
+                        "AdminKeyC19094DA",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "DependsOn": [
+                "CloudTrailLogsRoleDefaultPolicyD9019B15",
+                "CloudTrailLogsRole9F6E6663",
+                "CloudTrailBucketPolicy2A856177"
+            ],
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/CloudTrail/Resource"
+            },
+            "Condition": "ShouldCreateCloudTrailCondition"
+        },
+        "ConfigBucket2112C5EC": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "KMSMasterKeyID": {
+                                    "Fn::GetAtt": [
+                                        "AdminKeyC19094DA",
+                                        "Arn"
+                                    ]
+                                },
+                                "SSEAlgorithm": "aws:kms"
+                            }
+                        }
+                    ]
+                },
+                "LifecycleConfiguration": {
+                    "Rules": [
+                        {
+                            "ExpirationInDays": 3650,
+                            "Id": "Delete",
+                            "Status": "Enabled"
+                        }
+                    ]
+                },
+                "LoggingConfiguration": {
+                    "DestinationBucketName": {
+                        "Ref": "AccessLogsBucket83982689"
+                    },
+                    "LogFilePrefix": "config"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                },
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ],
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                }
+            },
+            "UpdateReplacePolicy": "Retain",
+            "DeletionPolicy": "Retain",
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/ConfigBucket/Resource"
+            },
+            "Condition": "ShouldCreateConfigCondition"
+        },
+        "ConfigBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "ConfigBucket2112C5EC"
+                },
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "s3:GetBucket*",
+                                "s3:GetObject*",
+                                "s3:List*"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:iam::",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":root"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "ConfigBucket2112C5EC",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "ConfigBucket2112C5EC",
+                                                    "Arn"
+                                                ]
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/ConfigBucketPolicy"
+            },
+            "Condition": "ShouldCreateConfigCondition"
+        },
+        "ConfigRoleF94F46B6": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "config.amazonaws.com"
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Description": "Grant Config access to other AWS services ",
+                "ManagedPolicyArns": [
+                    {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "arn:",
+                                {
+                                    "Ref": "AWS::Partition"
+                                },
+                                ":iam::aws:policy/service-role/AWS_ConfigRole"
+                            ]
+                        ]
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/ConfigRole/Resource"
+            },
+            "Condition": "ShouldCreateConfigCondition"
+        },
+        "ConfigRoleDefaultPolicy2CA5882C": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:PutObjectAcl"
+                            ],
+                            "Condition": {
+                                "StringLike": {
+                                    "s3:x-amz-acl": "bucket-owner-full-control"
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "ConfigBucket2112C5EC",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "/AWSLogs/",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Action": "s3:GetBucketAcl",
+                            "Effect": "Allow",
+                            "Resource": {
+                                "Fn::GetAtt": [
+                                    "ConfigBucket2112C5EC",
+                                    "Arn"
+                                ]
+                            }
+                        },
+                        {
+                            "Action": [
+                                "kms:Decrypt",
+                                "kms:GenerateDataKey"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": {
+                                "Fn::GetAtt": [
+                                    "AdminKeyC19094DA",
+                                    "Arn"
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "PolicyName": "ConfigRoleDefaultPolicy2CA5882C",
+                "Roles": [
+                    {
+                        "Ref": "ConfigRoleF94F46B6"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/ConfigRole/DefaultPolicy/Resource"
+            },
+            "Condition": "ShouldCreateConfigCondition"
+        },
+        "ConfigurationRecorder": {
+            "Type": "AWS::Config::ConfigurationRecorder",
+            "Properties": {
+                "RoleARN": {
+                    "Fn::GetAtt": [
+                        "ConfigRoleF94F46B6",
+                        "Arn"
+                    ]
+                },
+                "RecordingGroup": {
+                    "AllSupported": true,
+                    "IncludeGlobalResourceTypes": true
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/ConfigurationRecorder"
+            },
+            "Condition": "ShouldCreateConfigCondition"
+        },
+        "DeliveryChannel": {
+            "Type": "AWS::Config::DeliveryChannel",
+            "Properties": {
+                "S3BucketName": {
+                    "Ref": "ConfigBucket2112C5EC"
+                },
+                "ConfigSnapshotDeliveryProperties": {
+                    "DeliveryFrequency": "One_Hour"
+                },
+                "S3KmsKeyArn": {
+                    "Fn::GetAtt": [
+                        "AdminKeyC19094DA",
+                        "Arn"
+                    ]
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/DeliveryChannel"
+            },
+            "Condition": "ShouldCreateConfigCondition"
+        },
+        "GuardDutyDetector": {
+            "Type": "AWS::GuardDuty::Detector",
+            "Properties": {
+                "Enable": true,
+                "FindingPublishingFrequency": "FIFTEEN_MINUTES",
+                "Tags": [
+                    {
+                        "Key": "created-by",
+                        "Value": "GovernanceStack"
+                    }
+                ]
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/GuardDutyDetector"
+            },
+            "Condition": "ShouldCreateGuardDutyCondition"
+        },
+        "SecurityHub": {
+            "Type": "AWS::SecurityHub::Hub",
+            "Properties": {
+                "Tags": {
+                    "created-by": "GovernanceStack"
+                }
+            },
+            "Metadata": {
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/SecurityHub"
+            },
+            "Condition": "ShouldCreateGuardDutyCondition"
+        }
+    }
+}

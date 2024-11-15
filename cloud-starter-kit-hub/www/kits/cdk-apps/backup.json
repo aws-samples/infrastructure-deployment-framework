@@ -1,0 +1,39 @@
+{
+    "ConfigFile": "parameters.json",
+    "Parameters": {
+        "vaultName": {
+            "Label": "Vault Name",
+            "Description": "A unique name for this vault.",
+            "Type": "string",
+            "Default": "MyBackupVault",
+            "AllowedPattern": "^[a-zA-Z0-9_\\-]{3,50}$"
+        },
+        "enableVss": {
+            "Label": "Enable VSS for Windows",
+            "Description": "This option will enable AWS Backup to use VSS for Windows VM backups.",
+            "AllowedValues": [
+                true,
+                false
+            ],
+            "Default": true,
+            "CheckboxLabel": "Enable"
+        }
+    },
+    "Tags": {},
+    "Stacks": [
+        {
+            "name": "csk-backup-{vaultName}-stack",
+            "resourceCount": 18,
+            "hasOutputs": false
+        }
+    ],
+    "FileList": [
+        "backup/bin/aws-backup.ts",
+        "backup/lib/aws-backup-stack.ts",
+        "backup/buildspec.yml",
+        "backup/cdk.json",
+        "backup/package.json",
+        "backup/tsconfig.json",
+        "backup/parameters-template.json"
+    ]
+}

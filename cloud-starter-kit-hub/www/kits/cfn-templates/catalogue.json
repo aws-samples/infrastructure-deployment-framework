@@ -1,0 +1,78 @@
+{
+    "Catalogue": [
+        {
+            "TopLevelCategory": "Foundations",
+            "Category": "Security",
+            "Kits": [
+                {
+                    "Name": "Foundational Security Controls",
+                    "Description": "This kit deploys baseline security controls in the account - Amazon GuardDuty, AWS Config and AWS CloudTrail.",
+                    "Templates": [
+                        "management-governance.json"
+                    ],
+                    "VpcRequired": false,
+                    "Copyright": "© Guy Morton 2024",
+                    "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+                },
+                {
+                    "Name": "My New Kit",
+                    "Description": "This kit something interesting and useful.",
+                    "Templates": [
+                        "new-kit.json"
+                    ],
+                    "VpcRequired": false,
+                    "Copyright": "",
+                    "MoreInfo": ""
+                }
+            ]
+        },
+        {
+            "TopLevelCategory": "Foundations",
+            "Category": "Cost Management",
+            "Kits": [
+                {
+                    "Name": "Cost Management Foundations",
+                    "Description": "This stack creates an AWS Budget and budget alert in the target account.",
+                    "Templates": [
+                        "cost-management.json"
+                    ],
+                    "VpcRequired": false,
+                    "Copyright": "© Guy Morton 2024",
+                    "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+                }
+            ]
+        },
+        {
+            "TopLevelCategory": "Foundations",
+            "Category": "DevOps",
+            "Kits": [
+                {
+                    "Name": "Git Repository",
+                    "Description": "This stack creates a private Git repository in the target account.",
+                    "Templates": [
+                        "git-repo.json"
+                    ],
+                    "VpcRequired": true,
+                    "Copyright": "",
+                    "MoreInfo": ""
+                }
+            ]
+        },
+        {
+            "TopLevelCategory": "Advanced Solutions",
+            "Category": "Generative AI",
+            "Kits": [
+                {
+                    "Name": "Amazon Q for Business OneDrive Connector",
+                    "Description": "This stack creates and connects Amazon Q Business to your Microsoft OneDrive.",
+                    "Templates": [
+                        "q-onedrive.json"
+                    ],
+                    "VpcRequired": false,
+                    "Copyright": "",
+                    "MoreInfo": ""
+                }
+            ]
+        }
+    ]
+}

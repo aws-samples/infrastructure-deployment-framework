@@ -1,0 +1,156 @@
+{
+  "version": "38.0.1",
+  "artifacts": {
+    "csk-cdk-app-delivery-pipeline.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "csk-cdk-app-delivery-pipeline.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "csk-cdk-app-delivery-pipeline": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/unknown-region",
+      "properties": {
+        "templateFile": "csk-cdk-app-delivery-pipeline.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "notificationArns": [],
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/04563bc2e74c048be550d1634ff9c72204965071de02b24225bae4f828668c23.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "csk-cdk-app-delivery-pipeline.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-${AWS::Region}",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "csk-cdk-app-delivery-pipeline.assets"
+      ],
+      "metadata": {
+        "/csk-cdk-app-delivery-pipeline/Pipeline/ArtifactsBucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineArtifactsBucket22248F97"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/ArtifactsBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineArtifactsBucketPolicyD4F9712A"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineRoleD68726F7"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineRoleDefaultPolicyC7A05455"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineC660917D"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Source/S3Source/CodePipelineActionRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineSourceS3SourceCodePipelineActionRole8DE11A40"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Source/S3Source/CodePipelineActionRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineSourceS3SourceCodePipelineActionRoleDefaultPolicy352A3912"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Build/Build/CodePipelineActionRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineBuildCodePipelineActionRoleD77A08E6"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/Pipeline/Build/Build/CodePipelineActionRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/CskSourceBucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CskSourceBucket7D65FE4B"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/CskSourceBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CskSourceBucketPolicy512111C6"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/CodebuildServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CodebuildServiceRole0B2ADD6D"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/CodebuildServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CodebuildServiceRoleDefaultPolicy7A54D101"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/BuildProject/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BuildProject097C5DB7"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/ExportCskSourceBucketName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExportCskSourceBucketName"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/ExportCskPipelineName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExportCskPipelineName"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/csk-cdk-app-delivery-pipeline/CDKMetadata/Condition": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadataAvailable"
+          }
+        ]
+      },
+      "displayName": "csk-cdk-app-delivery-pipeline"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  }
+}

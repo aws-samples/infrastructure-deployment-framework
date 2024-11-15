@@ -1,0 +1,21 @@
+{
+    "ec2Name": "",
+    "os": "",
+    "diskSize": "",
+    "instanceType": "",
+    "amiId": "",
+    "customAmiId": "",
+    "keyPair": "",
+    "vpcId": "",
+    "subnetId": "",
+    "ingressIp": "",
+    "hostedZoneID": "",
+    "hostedZoneName": "",
+    "subdomain": "",
+    "userDataFile": "",
+    "region": "",
+    "account": "",
+    "kitId": "",
+    "appKey": "",
+    "businessName": ""
+}

@@ -1,0 +1,54 @@
+{
+    "name": "aws-cloud-starter-kit",
+    "productName": "Cloud Starter Kit",
+    "version": "1.0.4",
+    "description": "An app to help customers deploy solutions on AWS.",
+    "main": "src/scripts/main.js",
+    "scripts": {
+        "start": "electron-forge start",
+        "package": "electron-forge package",
+        "make": "electron-forge make",
+        "dir": "electron-builder --dir",
+        "dist": "electron-builder"
+    },
+    "keywords": [
+        "Electron",
+        "AWS",
+        "SDK",
+        "CDK",
+        "CloudFormation",
+        "Starter Kits",
+        "Partners"
+    ],
+    "author": "guymor@amazon.com",
+    "license": "MIT-0",
+    "devDependencies": {
+        "@electron-forge/cli": "^6.4.2",
+        "@electron-forge/maker-dmg": "^6.4.2",
+        "@electron-forge/maker-rpm": "^6.4.2",
+        "@electron-forge/maker-squirrel": "^6.4.2",
+        "@electron-forge/maker-zip": "^6.4.2",
+        "@eslint/js": "^9.11.0",
+        "electron": "^31.4.0",
+        "eslint": "^5.16.0",
+        "globals": "^15.9.0",
+        "uglify-js": "^3.19.3"
+    },
+    "dependencies": {
+        "@aws-sdk/client-cloudformation": "^3.672.0",
+        "@aws-sdk/client-codepipeline": "^3.671.0",
+        "@aws-sdk/client-ec2": "^3.670.0",
+        "@aws-sdk/client-iam": "^3.670.0",
+        "@aws-sdk/client-rds": "^3.670.0",
+        "@aws-sdk/client-route-53": "^3.687.0",
+        "@aws-sdk/client-s3": "^3.673.0",
+        "@aws-sdk/client-ssm": "^3.670.0",
+        "@aws-sdk/client-sts": "^3.670.0",
+        "@aws-sdk/credential-providers": "^3.670.0",
+        "@aws-sdk/lib-storage": "^3.673.0",
+        "electron-root-path": "^1.1.0",
+        "electron-squirrel-startup": "^1.0.1",
+        "js-yaml": "^4.1.0",
+        "jszip": "^3.10.1"
+    }
+}

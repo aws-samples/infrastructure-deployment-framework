@@ -1,0 +1,19 @@
+{
+  "version": "38.0.1",
+  "files": {
+    "04563bc2e74c048be550d1634ff9c72204965071de02b24225bae4f828668c23": {
+      "source": {
+        "path": "csk-cdk-app-delivery-pipeline.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "04563bc2e74c048be550d1634ff9c72204965071de02b24225bae4f828668c23.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

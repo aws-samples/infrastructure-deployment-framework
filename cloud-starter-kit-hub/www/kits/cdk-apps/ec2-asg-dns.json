@@ -1,0 +1,188 @@
+{
+    "ConfigFile": "parameters.json",
+    "KitDirectoryOverride": "ec2",
+    "ParameterGroups": [
+        {
+            "Label": {
+                "default": "Server Details"
+            },
+            "Parameters": [
+                "ec2Name",
+                "diskSize",
+                "instanceType",
+                "amiId",
+                "customAmiId",
+                "keyPair",
+                "userData"
+            ]
+        },
+        {
+            "Label": {
+                "default": "Networking Details"
+            },
+            "Parameters": [
+                "vpcId",
+                "subnetId",
+                "ingressIp",
+                "enableSessionManager",
+                "vpcEndpoint",
+                "enableEic",
+                "eicPrefixList",
+                "eicEndpoint"
+            ]
+        },
+        {
+            "Label": {
+                "default": "DNS Details"
+            },
+            "Parameters": [
+                "hostedZoneId",
+                "subdomain"
+            ]
+        },
+        {
+            "Label": {
+                "default": "Fleet Details"
+            },
+            "Parameters": [
+                "minCapacity",
+                "maxCapacity"
+            ]
+        }
+    ],
+    "Parameters": {
+        "ec2Name": {
+            "Label": "Instance Name",
+            "Description": "What name would you like to use to identify this instance? This name will uniquely identify this workload in this account and Region.",
+            "Type": "String",
+            "Default": "MyWebServer",
+            "AllowedPattern": "\\w{3,30}"
+        },
+        "diskSize": {
+            "Label": "Disk Size",
+            "Description": "The size of the disk in GB must be greater than 4GB and less than 1000GB",
+            "Type": "Number",
+            "MinValue": 4,
+            "MaxValue": 1000,
+            "Default": 20
+        },
+        "instanceType": {
+            "Label": "Instance Type",
+            "Description": "The instance type determines the hardware configuration of the instance",
+            "Type": "String",
+            "Default": "t3.nano"
+        },
+        "amiId": {
+            "Label": "The AMI to deploy",
+            "Description": "The AMI determines the OS that you server will run",
+            "Type": "AWS::EC2::Image::Id"
+        },
+        "customAmiId": {
+            "Label": "Custom AMI",
+            "Description": "If you have a specific AMI ID from this Region you want to use, enter it here.",
+            "Type": "CSK::ValidAmi",
+            "Default": ""
+        },
+        "keyPair": {
+            "Label": "EC2 KeyPair",
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "hostedZoneId": {
+            "Label": "Hosted Zone ID",
+            "Description": "Name of an existing hosted zone",
+            "Type": "AWS::Route53::HostedZone::Id"
+        },
+        "subdomain": {
+            "Label": "Subdomain",
+            "Description": "String at the start of the domain name",
+            "Type": "String",
+            "Default": "www"
+        },
+        "userData": {
+            "Label": "User Data",
+            "Description": "Commands that will be executed when the instance boots",
+            "Type": "CSK::Userdata",
+            "MaxLength": 500
+        },
+        "vpcId": {
+            "Label": "VPC",
+            "Description": "The VPC where the instance is going to be deployed",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "subnetId": {
+            "Label": "Subnet",
+            "Description": "The Subnet where this instance is going to be deployed",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "enableEic": {
+            "Label": "Enable Instance Connect",
+            "Description": "EC2 Instance Connect allows you to connect securely to an instance from the internet, without using a bastion host, or requiring that your virtual private cloud (VPC) has direct internet connectivity. If your instance is being deployed to a private subnet and will not have a public IP address, an EC2 Instance Connect Endpoint will be created.",
+            "AllowedValues": [
+                "Yes",
+                "No"
+            ],
+            "Default": "No"
+        },
+        "enableSessionManager": {
+            "Label": "Enable Session Manager",
+            "Description": "AWS Systems Manager Session Manager allows you to connect securely to an instance from the internet, without using a bastion host, or requiring that your virtual private cloud (VPC) has direct internet connectivity. If you do not have a route to the Session Manageer service via NAT, choosing this option will require SSM VPC endpoints. SSM VPC endpoints will be created if they are not already present in this VPC.",
+            "AllowedValues": [
+                "Yes",
+                "No"
+            ],
+            "Default": "No"
+        },
+        "eicPrefixList": {
+            "Type": "CSK::PrefixList",
+            "Service": "ec2-instance-connect",
+            "Hidden": true
+        },
+        "eicEndpoint": {
+            "Type": "CSK::EicEndpoint",
+            "Hidden": true
+        },
+        "vpcEndpoint": {
+            "Type": "CSK::VpcEndpoint",
+            "Hidden": true
+        },
+        "ingressIp": {
+            "Label": "Ingress IP",
+            "Description": "The IP address range that will connect to this instance (defaults to your external IP)",
+            "Type": "CSK::UserIp",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+        },
+        "minCapacity": {
+            "Label": "Min Instances in Fleet",
+            "Description": "There will be a minimum of this many instances in your Auto Scaling Group.",
+            "Type": "Number",
+            "MinValue": 1,
+            "MaxValue": 100,
+            "Default": 1
+        },
+        "maxCapacity": {
+            "Label": "Max Instances in Fleet",
+            "Description": "There will be a maximum of this many instances in your Auto Scaling Group.",
+            "Type": "Number",
+            "MinValue": 1,
+            "MaxValue": 100,
+            "Default": 2
+        }
+    },
+    "Tags": {},
+    "Stacks": [
+        {
+            "name": "csk-ec2-{ec2Name}-stack",
+            "resourceCount": 15,
+            "hasOutputs": true
+        }
+    ],
+    "FileList": [
+        "ec2/bin/ec2.js",
+        "ec2/lib/ec2-stack.js",
+        "ec2/buildspec.yml",
+        "ec2/cdk.json",
+        "ec2/package.json",
+        "ec2/parameters-template.json"
+    ]
+}

@@ -1,0 +1,134 @@
+{
+    "ConfigFile": "parameters.json",
+    "ParameterGroups": [
+        {
+            "Label": {
+                "default": "Server Details"
+            },
+            "Parameters": [
+                "dbName",
+                "dbEngineVersion",
+                "instanceClass",
+                "initialStorage",
+                "maxStorage",
+                "backupRetentionDays"
+            ]
+        },
+        {
+            "Label": {
+                "default": "Read Replica"
+            },
+            "Parameters": [
+                "createReadReplica",
+                "replicaInstanceClass"
+            ]
+        },
+        {
+            "Label": {
+                "default": "Networking Details"
+            },
+            "Parameters": [
+                "vpcId",
+                "subnetOneId",
+                "subnetTwoId",
+                "ingressIp"
+            ]
+        }
+    ],
+    "Parameters": {
+        "dbName": {
+            "Label": "Database Name",
+            "Description": "What name would you like to use to identify this db?",
+            "Type": "String",
+            "Default": "MyDatabase",
+            "AllowedPattern": "\\w{3,30}"
+        },
+        "initialStorage": {
+            "Label": "Initial Allocated Storage",
+            "Description": "Initial storage allocation, in GB (must be greater than 4GB and less than 1000GB)",
+            "Type": "Number",
+            "MinValue": 4,
+            "MaxValue": 1000,
+            "Default": 20
+        },
+        "maxStorage": {
+            "Label": "Maximum Storage Allowed",
+            "Description": "Max storage size your instance will scale to, in GB (must be greater than 4GB and less than 1000GB)",
+            "Type": "Number",
+            "MinValue": 4,
+            "MaxValue": 1000,
+            "Default": 100
+        },
+        "backupRetentionDays": {
+            "Label": "Daily Snapshot Retention",
+            "Description": "Number of days of automated snapshots that will be retained for this instance. Set to 0 to disable.",
+            "Type": "Number",
+            "MinValue": 0,
+            "MaxValue": 35,
+            "Default": 14
+        },
+        "instanceClass": {
+            "Label": "Instance Class",
+            "Description": "The instance class determines the hardware configuration of the instance. The instance classes that are available will vary by database engine. You should generally choose the latest generation of an instance family. Choose the size (medium/large etc) based on expected load - you can scale the instance size up or down later, via the console.",
+            "InfoLink": "https://aws.amazon.com/rds/instance-types/",
+            "Type": "CSK::DbInstanceClass"
+        },
+        "createReadReplica": {
+            "Label": "Read Replica",
+            "Description": "Do you want to create a read replica for this instance?",
+            "AllowedValues": [
+                "Yes",
+                "No"
+            ],
+            "Default": "No"
+        },
+        "replicaInstanceClass": {
+            "Label": "Replica Instance Class",
+            "Description": "The instance class determines the hardware configuration of the instance. The instance classes that are available will vary by database engine. You should generally choose the latest generation of an instance family. Choose the size (medium/large etc) based on expected load - you can scale the instance size up or down later, via the console.",
+            "InfoLink": "https://aws.amazon.com/rds/instance-types/",
+            "Type": "CSK::DbInstanceClass"
+        },
+        "dbEngineVersion": {
+            "Label": "DB Engine Version",
+            "Description": "The engine version determines the software configuration for the instance. You should generally choose the latest release of the major version you want.",
+            "Type": "CSK::DbEngineVersion"
+        },
+        "vpcId": {
+            "Label": "VPC",
+            "Description": "The VPC where the instance will be deployed",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "subnetOneId": {
+            "Label": "Subnet One",
+            "Description": "With Subnet Two, the Subnets where this instance will be deployed. Should be a private or isolated subnet.",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "subnetTwoId": {
+            "Label": "Subnet Two",
+            "Description": "With Subnet One, the Subnets where this instance will be deployed. Should be a private or isolated subnet.",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "ingressIp": {
+            "Label": "Ingress IP",
+            "Description": "The IP address range that will connect to this instance (defaults to your external IP)",
+            "Type": "CSK::UserIp",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+        }
+    },
+    "Tags": {},
+    "Stacks": [
+        {
+            "name": "csk-mysql-{dbName}-stack",
+            "resourceCount": 12,
+            "hasOutputs": true
+        }
+    ],
+    "FileList": [
+        "mysql/bin/mysql.js",
+        "mysql/lib/mysql-stack.js",
+        "mysql/buildspec.yml",
+        "mysql/cdk.json",
+        "mysql/package.json",
+        "mysql/parameters-template.json"
+    ]
+}
