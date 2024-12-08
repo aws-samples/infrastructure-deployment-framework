@@ -26,8 +26,8 @@ source .venv/bin/activate
 or on Windows
 
 ```
-% python -m venv .venv
-% .venv\Scripts\activate.bat
+python -m venv .venv
+.venv\Scripts\activate.bat
 ```
 
 Once the virtualenv is activated, you can install the required dependencies.
@@ -40,7 +40,7 @@ pip install -r requirements.txt
 
 There is a file called `parameters-template.json` in the root of the project. Copy that and rename the copy `parameters-prod.json`.
 
-```
+```code{showCopyAction=true}
 cp parameters-template.json parameters-prod.json
 ```
 
