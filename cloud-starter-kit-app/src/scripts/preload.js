@@ -545,12 +545,13 @@ async function prepareRegion(callback) {
     }
   }, (err) => {
     console.log("pre-requisite stack not found, will attempt to create", err);
+    const templateContent = fs.readFileSync(path.join(rootPath, 'pipeline-assets', 'cdk-app-pipeline', 'cdk.out', 'csk-cdk-app-delivery-pipeline.template.json'), 'utf-8');
     let params = {
       StackName: 'csk-cdk-app-delivery-pipeline-stack',
       Capabilities: ['CAPABILITY_NAMED_IAM'],
-      TemplateBody: fs.readFileSync(path.join(rootPath, 'pipeline-assets', 'cdk-app-pipeline', 'cdk.out', 'csk-cdk-app-delivery-pipeline.template.json'), 'utf-8')
+      TemplateBody: templateContent
     }
-    const command = new CreateStackCommand({ StackName: "csk-cdk-app-delivery-pipeline-stack" });
+    const command = new CreateStackCommand(params);
     cloudFormation.send(command).then((data) => {
       callback(null, data);    // successful response
     }, (err) => {
