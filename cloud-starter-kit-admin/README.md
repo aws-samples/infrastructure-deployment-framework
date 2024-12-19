@@ -59,22 +59,43 @@ cp parameters-template.json parameters-prod.json
 
 ### Install additional dependencies 
 
-Install the dependencies for the Lambda@Edge functions.
+1. Install the `crhelper` pip package
 
 ```
 cd custom-resources
 pip install crhelper -t .
+cd ..
 ```
 
-Change directory back to the project root, then 
+2. Install the Cognito auth Lambda@Edge dependencies
+
+Once you're back in the project root:
 
 ```
 cd lambda/cognito_auth
 npm install
+cd ../..
 ```
 
 >**NOTE:** If you make any changes to the Lambda@Edge functions you must force a new version to be created by modifying the resource ID for the Lambda version in the web stack. If you do not, your changes will not be propagated.
 
+3. Create the Lambda layer used by the admin python Lambdas
+
+From the project root, on Mac:
+
+```
+cd lambda
+./make_layer.sh
+```
+
+or on Windows
+
+```
+cd lambda
+.\make_layer.ps1
+```
+
+You should now have a file called `python.zip` in the `lambda` directory.
 
 ## Edit the `parameters` file
 
@@ -137,10 +158,17 @@ Once you have entered the hosted zone info into the parameters file you can depl
 
 ```
 cdk deploy csk-admin-cognito-stack -c env=prod
-cdk deploy csk-admin-cognito-ui-stack -c env=prod
 ```
 
-Once deployed, you will need to copy the exported values from the stack outputs `csk-admin-user-pool-client-id` and `csk-admin-user-pool-id` and enter their values into the `parameters.json` file.
+>**Note** if you use any value for `env` apart from `prod`, you will need to include that in the stack name, eg `env=test` will require the stack name to be `csk-admin-cognito-test-stack`. 
+
+Once the Cognito stack is deployed, update the `parameters-prod.json` file with the Cognito user pool ID and user pool client ID - you can find these in the CloudFormation console, under the Outputs tab for the Cognito stack, as `csk-admin-user-pool-id` and `csk-admin-user-pool-client-id`.
+
+Once that's done and saved, deploy the Cognito UI stack:
+
+```
+cdk deploy csk-admin-cognito-ui-stack -c env=prod
+```
 
 Once you have done that, you can deploy the other two stacks. You can do this by just requesting the deployment of the WebStack, as it will automatically deploy the ApiStack first.
 
