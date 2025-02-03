@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "micromatch": "^4.0.8",
-    "aws-cdk-lib": "2.166.0",
+    "aws-cdk-lib": "2.177.0",
     "constructs": "^10.0.0"
   }
 }
