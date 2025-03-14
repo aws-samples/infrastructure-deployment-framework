@@ -45,7 +45,7 @@
           Distributor</div>
         <div id="list-customers-button" class="left-hand-menu-item" content="list-customers">List CSKs</div>
         <div id="create-customer-button" class="left-hand-menu-item" content="create-customer">Create CSK</div>
-        <div id="reports-button" class="left-hand-menu-item" content="reports">CSK Reports</div>
+        <div id="reports-button" class="left-hand-menu-item" content="reports">CSK App Data</div>
         <div id="config-button" class="left-hand-menu-item" content="config">Configuration</div>
         <div id="manage-users-button" class="left-hand-menu-item" hidden content="manage-users">Manage Users</div>
         <div id="edit-customer-button" class="left-hand-menu-item" hidden content="edit-customer">Edit CSK</div>
@@ -296,8 +296,15 @@
         </div>
       </div>
       <div id="reports" hidden>
-        <h1 class="heading">Reports</h1>
-        <p>Coming soon - some stats about your Customer CSKs.</p>
+        <h1 class="heading">CSK App Data</h1>
+        <form id="get-stats-form">
+          <p><b>Deployments</b> from <input id="deployments-from" type="date"> to <input id="deployments-to"
+              type="date">
+            <button id="get-deployments-submit">Download</button>
+          </p>
+          <p><b>Actions</b> from <input id="actions-from" type="date"> to <input id="actions-to" type="date"> <button
+              id="get-actions-submit">Download</button></p>
+        </form>
       </div>
       <div id="manage-users" hidden>
         <h1 class="heading">Manage Users</h1>

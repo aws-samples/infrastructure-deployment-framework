@@ -8,7 +8,7 @@ const path = require("path");
 const params = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../', 'parameters.json')).toString());
 
 const app = new cdk.App();
-new ExampleStack(app, `csk-ec2-${params["example"]}-stack`, {
+new ExampleStack(app, `csk-example-${params["example"]}-stack`, {
   params: params,
   env: { account: params["account"], region: params["region"] },
 });

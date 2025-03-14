@@ -72,7 +72,7 @@ class ApiStack(Stack):
             removal_policy=cdk.RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
         )
 
-        csk_config_table.add_global_secondary_index(
+        dist_csk_config_gsi = csk_config_table.add_global_secondary_index(
             index_name="distributor_id_gsi",
             partition_key=ddb.Attribute(
                 name="distributor_id", type=ddb.AttributeType.STRING
@@ -188,6 +188,31 @@ class ApiStack(Stack):
         csk_actions_table.grant_read_write_data(reporting_lambda)
         stack_deployments_table.grant_read_write_data(reporting_lambda)
 
+        stats_lambda = aws_lambda.Function(
+            self,
+            "stats_lambda",
+            code=aws_lambda.Code.from_asset(
+                path=os.path.join("lambda"),
+            ),
+            handler="stats.lambda_handler",
+            runtime=aws_lambda.Runtime.PYTHON_3_12,
+            timeout=Duration.seconds(3),
+            environment={
+                "CSK_ACTIONS_TABLE": csk_actions_table.table_name,
+                "STACK_DEPLOYMENTS_TABLE": stack_deployments_table.table_name,
+                "ADMIN_EMAIL_DOMAIN": params["admin_email_domain"],
+                "CSK_CONFIG_TABLE": csk_config_table.table_name,
+                "USER_DISTRIBUTORS_TABLE": user_distributors_table.table_name,
+                "DISTRIBUTOR_CONFIG_TABLE": distributor_config_table.table_name,
+            },
+        )
+
+        csk_actions_table.grant_read_data(stats_lambda)
+        stack_deployments_table.grant_read_data(stats_lambda)
+        csk_config_table.grant_read_data(stats_lambda)
+        distributor_config_table.grant_read_data(stats_lambda)
+        user_distributors_table.grant_read_data(stats_lambda)
+
         cors_options = apigateway.CorsOptions(
             allow_origins=apigateway.Cors.ALL_ORIGINS,
             allow_methods=apigateway.Cors.ALL_METHODS,
@@ -285,7 +310,22 @@ class ApiStack(Stack):
             authorizer=cognito_authoriser,
             authorization_type=apigateway.AuthorizationType.COGNITO,
         )
+        # data route
+        stats_api = self.api.root.add_resource("stats")
+        stats_api_int = apigateway.LambdaIntegration(
+            handler=stats_lambda,
+            proxy=True,
+        )
 
+        stats_api_res = stats_api.add_resource(
+            "data", default_cors_preflight_options=cors_options
+        )
+        stats_api_res.add_method(
+            "POST",
+            stats_api_int,
+            authorizer=cognito_authoriser,
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+        )
         # config service
         config_api = self.api.root.add_resource("config")
 

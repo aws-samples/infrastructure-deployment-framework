@@ -1,4 +1,5 @@
 const MANAGEMENT_URL = '/api/admin/manage';
+const STATISTICS_URL = '/api/stats/data';
 let CSK_LIST = [];
 let DISTRIBUTOR_LIST = [];
 let ID_TOKEN = sessionStorage.getItem("id_token");
@@ -7,6 +8,14 @@ const languages = { "en-US": "English", "es-ES": "Spanish" }
 let distributors = {};
 let pinger = null;
 let selectedMenu = { target: { id: "list-customers-button", content: "list-customers" } };
+
+let now = new Date();
+let earlier = new Date();
+earlier.setMonth(now.getMonth() - 1);
+document.getElementById(`actions-from`).value = earlier.toISOString().split('T')[0];
+document.getElementById(`actions-to`).value = now.toISOString().split('T')[0];
+document.getElementById(`deployments-from`).value = earlier.toISOString().split('T')[0];
+document.getElementById(`deployments-to`).value = now.toISOString().split('T')[0];
 
 // Run once on app load
 async function populateDistributorOptions() {
@@ -761,6 +770,86 @@ createDistributorForm.addEventListener("submit", (event) => {
   createDistributor();
 })
 
+/*
+* Get stats
+*/
+
+let statsForm = document.getElementById('get-stats-form');
+
+async function getDeploymentsSubmit() {
+  getDataSubmit('deployments')
+}
+async function getActionsSubmit() {
+  getDataSubmit('actions')
+}
+
+var saveData = (function () {
+  var a = document.createElement("a");
+  document.body.appendChild(a);
+  a.style = "display: none";
+  return function (blob, fileName) {
+    var url = window.URL.createObjectURL(blob);
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+}());
+
+async function getDataSubmit(dataType) {
+  document.getElementById(`get-${dataType}-submit`).disabled = true;
+  let start_date = document.getElementById(`${dataType}-from`).value
+  let end_date = document.getElementById(`${dataType}-to`).value
+  try {
+    const response = await fetch(STATISTICS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": ID_TOKEN
+      },
+      body: JSON.stringify(
+        {
+          "data_type": dataType,
+          "start_date": start_date,
+          "end_date": end_date
+        }
+      )
+    });
+    if (response.ok) {
+      const excelBlob = await response.blob();
+      // var link = window.URL.createObjectURL(excelBlob);
+      saveData(excelBlob, `${dataType}-${start_date}-${end_date}.csv`);
+      // console.log(resBody);
+      // if (resBody.result === "success") {
+      //   displaySuccess(`Data retrieved successfully ${resBody.items}`);
+      // } else {
+      //   displayErrors(`Failed to get statistics: ${resBody.result}`);
+      // }
+    } else {
+      displayErrors(`Failed to get statistics: ${response.statusText}`);
+      console.log(response.status, response.statusText);
+    }
+    document.getElementById(`get-${dataType}-submit`).disabled = false;
+  }
+  catch (e) {
+    if (confirm("API call failed, would you like to log back in?")) {
+      location.reload()
+    }
+  }
+}
+
+document.getElementById('get-deployments-submit').addEventListener("click", (event) => {
+  event.preventDefault();
+  getDeploymentsSubmit();
+})
+document.getElementById('get-actions-submit').addEventListener("click", (event) => {
+  event.preventDefault();
+  getActionsSubmit();
+})
+
+/* 
+* display errors 
+*/
 function displayErrors(error) {
   if (typeof error === 'object') {
     error = error.toString();
