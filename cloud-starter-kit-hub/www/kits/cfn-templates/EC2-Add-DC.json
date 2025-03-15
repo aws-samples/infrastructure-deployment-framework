@@ -1,0 +1,379 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Bundle for a Windows Active Directory (add DC)",
+    "Metadata": {
+        "License": "Apache-2.0",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Network Configuration"
+                    },
+                    "Parameters": [
+                        "myVPC",
+                        "SubnetID"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "AD Configuration Parameters"
+                    },
+                    "Parameters": [
+                        "Hostname",
+                        "DomainDNSName",
+                        "DomainAdmin",
+                        "DomainAdminPassword",
+                        "DomainController1",
+                        "DomainController2",
+                        "SafeModeAdministratorPassword"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Virtual Machine Configuration Parameters"
+                    },
+                    "Parameters": [
+                        "ServerName",
+                        "KeyName",
+                        "VMInstanceType",
+                        "RDPLocation",
+                        "LatestOS"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "myVPC": {
+                    "default": "Which VPC should this be deployed to?"
+                },
+                "SubnetID": {
+                    "default": "Which is the Subnet ID in which this Domain Controller should be deployed in?"
+                },
+                "Hostname": {
+                    "default": "What will be the Domain Controller Hostname"
+                },
+                "DomainDNSName": {
+                    "default": "What is the domain DNS Name"
+                },
+                "DomainAdmin": {
+                    "default": "Input the domain admin user that will promote this domain controller:"
+                },
+                "DomainAdminPassword": {
+                    "default": "Key in the domain admin password:"
+                },
+                "ServerName": {
+                    "default": "Key in the Virtual Machine name:"
+                },
+                "KeyName": {
+                    "default": "Select the key-pair that will be used to RDP to the Domain Controller"
+                },
+                "VMInstanceType": {
+                    "default": "Select the Virtual Machine size"
+                },
+                "RDPLocation": {
+                    "default": "Key in the RDP source IP - Recommended to be the IP of a Bastion Host"
+                },
+                "LatestOS": {
+                    "default": "Choose windows image"
+                }
+            }
+        }
+    },
+    "Parameters": {
+       
+        "ServerName": {
+            "Description": "Please provide a server name",
+            "Type": "String"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair"
+        },
+        "VMInstanceType": {
+            "Description": "WebServer EC2 instance type (for SMALL server use t3.medium, for a MEDIUM server use m5.large, for a LARGE server use m5.xlarge)",
+            "Type": "String",
+            "ConstraintDescription": "must be a valid EC2 instance type",
+            "Default": "t3.medium"
+        },
+        "myVPC": {
+            "Description": "The VPC ID where the instance is going to be deployed",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "SubnetID": {
+            "Description": "The SubnetID where this instance is going to be deployed",
+            "Type": "AWS::EC2::Subnet::Id",
+            "ConstraintDescription": "must be the ID of an existing subnet"
+        },
+        "RDPLocation": {
+            "Description": "The IP address range that can be used to RDP to the Virtual Machine",
+            "Type": "String",
+            "MinLength": 9,
+            "MaxLength": 18,
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x.",
+            "Default": "0.0.0.0/0"
+        },
+        "Hostname": {
+            "Description": "Hostname - maximum 15 characters",
+            "Type": "String",
+            "MaxLength": 15
+        },
+        "DomainDNSName": {
+            "Description": "Fully Qualified Domain Name",
+            "Type": "String",
+            "Default": "mydomain.com.au"
+        },
+        "DomainAdmin": {
+            "Description": "Domain admin that can promote the DC in the format 'domainadmin@domain.com'",
+            "Type": "String",
+            "Default": "domainadmin@domain.com"
+        },
+        "DomainAdminPassword": {
+            "Description": "Domain Admin Password for the user that promotes the DC",
+            "Type": "String",
+            "NoEcho": "true",
+            "Default": "WinThreshold"
+        },
+        "DomainController1": {
+            "Description": "Primary on-premise domain controller with DNS",
+            "Type": "String",
+            "MinLength": 6,
+            "MaxLength": 15,
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
+            "Default": "8.8.8.8"
+        },
+        "DomainController2": {
+            "Description": "Secondary on-premise domain controller with DNS",
+            "Type": "String",
+            "MinLength": 6,
+            "MaxLength": 15,
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
+            "Default": "8.8.8.8"
+        },
+        "SafeModeAdministratorPassword": {
+            "Description": "Safe Mode Administrator Password - minimum 8 characters",
+            "Type": "String",
+            "MinLength": 8,
+            "NoEcho": "true"
+        },
+        "LatestOS": {
+            "Description": "The latest Windows OS",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+            "AllowedValues": [
+                "/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base",
+                "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+                "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base"
+            ],
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base"
+        }
+    },
+    "Resources": {
+        "EC2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "config": [
+                            "create-scripts",
+                            "configure-instance"
+                        ]
+                    },
+                    "create-scripts": {
+                        "files": {
+                            "c:\\cfn\\Add-DNS.ps1": {
+                                "content": {
+                                    "Fn::Sub": "[CmdletBinding()]\nparam (\n    [Parameter(Mandatory=$true)]\n    [string]$edc1,\n  \n    [Parameter(Mandatory=$true)]\n    [string]$edc2\n)\n$AdapterIndex = (Get-NetAdapter).InterfaceIndex\nset-DnsClientServerAddress -InterfaceIndex $AdapterIndex -ServerAddresses (\"$edc1\",\"$edc2\")\n"
+                                }
+                            },
+                            "c:\\cfn\\Add-WindowsComponents.ps1": {
+                                "content": {
+                                    "Fn::Sub": "Add-WindowsFeature -Name RSAT-AD-PowerShell\nAdd-WindowsFeature -Name AD-Domain-Services -IncludeAllSubFeature -IncludeManagementTools\nAdd-WindowsFeature -Name DNS -IncludeAllSubFeature -IncludeManagementTools\nAdd-WindowsFeature -Name GPMC -IncludeAllSubFeature -IncludeManagementTools\n"
+                                }
+                            },
+                            "c:\\cfn\\CF_Configure-ADForest.ps1": {
+                                "content": {
+                                    "Fn::Sub": "[CmdletBinding()]\nparam (\n    [Parameter(Mandatory=$true)]\n    [string]$DomainName,\n\n    [Parameter(Mandatory=$true)]\n    [string]$username,\n\n    [Parameter(Mandatory=$true)]\n    [string]$password,\n\n    [Parameter(Mandatory=$true)]\n    [string]$SafeModeAdministratorPassword\n)\n$secuserpwd = ConvertTo-SecureString -String $password -AsPlainText -Force\n$psCred = New-Object System.Management.Automation.PSCredential -ArgumentList ($username, $secuserpwd)\n$SecuredSafeModeAdministratorPassword = ConvertTo-SecureString -String $SafeModeAdministratorPassword -AsPlainText -Force\nInstall-ADDSDomainController -InstallDns -Credential $psCred -DomainName $DomainName -SafeModeAdministratorPassword $SecuredSafeModeAdministratorPassword -Force:$true\n"
+                                }
+                            }
+                        }
+                    },
+                    "configure-instance": {
+                        "commands": {
+                            "1-set-powershell-execution-policy": {
+                                "command": "powershell.exe -Command \"Set-ExecutionPolicy UnRestricted -Force\"",
+                                "waitAfterCompletion": "0"
+                            },
+                            "2-rename-computer": {
+                                "command": {
+                                    "Fn::Sub": "powershell.exe -Command \"Rename-Computer -Restart -NewName \"${Hostname}"
+                                },
+                                "waitAfterCompletion": "forever"
+                            },
+                            "3-install-windows-components": {
+                                "command": "powershell.exe -Command \"c:\\cfn\\Add-WindowsComponents.ps1\"",
+                                "waitAfterCompletion": "0"
+                            },
+                            "4-add-ad-dns": {
+                                "command": {
+                                    "Fn::Sub": "powershell.exe -Command \"c:\\cfn\\Add-DNS.ps1\" -edc1 '${DomainController1}' -edc2 '${DomainController2}'\""
+                                },
+                                "waitAfterCompletion": "0"
+                            },
+                            "5-install-ADForest": {
+                                "command": {
+                                    "Fn::Sub": "powershell.exe -Command \"c:\\cfn\\CF_Configure-ADForest.ps1 -DomainName '${DomainDNSName}' -username '${DomainAdmin}' -password '${DomainAdminPassword}' -SafeModeAdministratorPassword '${SafeModeAdministratorPassword}'\""
+                                },
+                                "waitAfterCompletion": "forever"
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "VMInstanceType"
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestOS"
+                },
+                "NetworkInterfaces": [
+                    {
+                        "Description": "Primary network interface",
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "SubnetID"
+                        },
+                        "AssociatePublicIpAddress": true,
+                        "GroupSet": [
+                            {
+                                "Ref": "InstanceSecurityGroup"
+                            }
+                        ]
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "<powershell>\ncfn-init.exe  --stack ${AWS::StackId} --resource EC2Instance --region ${AWS::Region} --configsets config -v \ncfn-signal.exe   ---exit-code 0 --region ${AWS::Region} --resource EC2Instance --stack ${AWS::StackName}\n</powershell>\n"
+                    }
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "ServerName"
+                        }
+                    }
+                ]
+            }
+        },
+        "InstanceSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "GroupDescription": "Enable RDP access via port 3389",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 3389,
+                        "ToPort": 3389,
+                        "CidrIp": {
+                            "Ref": "RDPLocation"
+                        }
+                    }
+                ]
+            }
+        },
+        "NewVolume": {
+            "Type": "AWS::EC2::Volume",
+            "DependsOn": "EC2Instance",
+            "Properties": {
+                "Size": 50,
+                "VolumeType": "gp3",
+                "AvailabilityZone": {
+                    "Fn::GetAtt": [
+                        "EC2Instance",
+                        "AvailabilityZone"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "BundleVolume"
+                    }
+                ]
+            },
+            "DeletionPolicy": "Snapshot"
+        },
+        "MountPoint": {
+            "Type": "AWS::EC2::VolumeAttachment",
+            "DependsOn": "NewVolume",
+            "Properties": {
+                "InstanceId": {
+                    "Ref": "EC2Instance"
+                },
+                "VolumeId": {
+                    "Ref": "NewVolume"
+                },
+                "Device": "/dev/sdh"
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "InstanceId of the newly created EC2 instance",
+            "Value": {
+                "Ref": "EC2Instance"
+            }
+        },
+        "AZ": {
+            "Description": "Availability Zone of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "AvailabilityZone"
+                ]
+            }
+        },
+        "PublicDNS": {
+            "Description": "Public DNSName of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PublicDnsName"
+                ]
+            }
+        },
+        "PublicIP": {
+            "Description": "Public IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PublicIp"
+                ]
+            }
+        },
+        "PrivateDNS": {
+            "Description": "Private DNSName of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PrivateDnsName"
+                ]
+            }
+        },
+        "PrivateIP": {
+            "Description": "Private IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PrivateIp"
+                ]
+            }
+        }
+    }
+}

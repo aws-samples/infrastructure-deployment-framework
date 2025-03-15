@@ -1,0 +1,661 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Bundle for WebApp Windows & MS SQL - large",
+    "Metadata": {
+        "License": "Apache-2.0",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Network Configuration"
+                    },
+                    "Parameters": [
+                        "VPCCIDR"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Virtual Machine Server Details"
+                    },
+                    "Parameters": [
+                        "ServerName",
+                        "LatestAmiId",
+                        "KeyName"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "DB Configuration"
+                    },
+                    "Parameters": [
+                        "DBUser",
+                        "DBPassword"
+                    ]
+                }
+            ]
+        }
+    },
+    "Parameters": {
+        "VPCCIDR": {
+            "Description": "Enter the CIDR value of your network in AWS",
+            "Type": "String",
+            "Default": "173.0.0.0/16"
+        },
+        "ServerName": {
+            "Description": "Please provide a server name",
+            "Type": "String"
+        },
+        "LatestAmiId": {
+            "Description": "The latest Windows OS",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+            "AllowedValues": [
+                "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+                "/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base",
+                "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base"
+            ],
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable RDP access to the WebServer instance",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair"
+        },
+        "DBUser": {
+            "Description": "The database admin account username",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 16,
+            "NoEcho": "true",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters"
+        },
+        "DBPassword": {
+            "Description": "The database admin account password",
+            "Type": "String",
+            "MinLength": 8,
+            "MaxLength": 41,
+            "NoEcho": "true",
+            "AllowedPattern": "[a-zA-Z0-9]*",
+            "ConstraintDescription": "must contain only alphanumeric characters"
+        }
+    },
+    "Resources": {
+        "myVPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VPCCIDR"
+                },
+                "EnableDnsSupport": true,
+                "EnableDnsHostnames": true,
+                "Tags": [
+                    {
+                        "Key": "stack",
+                        "Value": "Network-Bundle"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "VPC-Standard-${AWS::StackName}"
+                        }
+                    }
+                ]
+            }
+        },
+        "PublicSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::Cidr": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "myVPC",
+                                        "CidrBlock"
+                                    ]
+                                },
+                                10,
+                                8
+                            ]
+                        }
+                    ]
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "PublicSubnet1-${AWS::StackName}"
+                        }
+                    }
+                ]
+            }
+        },
+        "PublicSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        2,
+                        {
+                            "Fn::Cidr": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "myVPC",
+                                        "CidrBlock"
+                                    ]
+                                },
+                                10,
+                                8
+                            ]
+                        }
+                    ]
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "PublicSubnet2-${AWS::StackName}"
+                        }
+                    }
+                ]
+            }
+        },
+        "PrivateSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        3,
+                        {
+                            "Fn::Cidr": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "myVPC",
+                                        "CidrBlock"
+                                    ]
+                                },
+                                10,
+                                8
+                            ]
+                        }
+                    ]
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "PrivateSubnet1-${AWS::StackName}"
+                        }
+                    }
+                ]
+            }
+        },
+        "PrivateSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        4,
+                        {
+                            "Fn::Cidr": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "myVPC",
+                                        "CidrBlock"
+                                    ]
+                                },
+                                10,
+                                8
+                            ]
+                        }
+                    ]
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "PrivateSubnet2-${AWS::StackName}"
+                        }
+                    }
+                ]
+            }
+        },
+        "StandardIG": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}-Standard-IG"
+                        }
+                    }
+                ]
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "StandardIG"
+                }
+            }
+        },
+        "PublicRT": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "PublicRT"
+                    }
+                ]
+            }
+        },
+        "PrivateRT": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "PrivateRT"
+                    }
+                ]
+            }
+        },
+        "PublicRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "StandardIG",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRT"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "StandardIG"
+                }
+            }
+        },
+        "PublicSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRT"
+                }
+            }
+        },
+        "PublicSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet2"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRT"
+                }
+            }
+        },
+        "PrivateSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrivateSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRT"
+                }
+            }
+        },
+        "PrivateSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrivateSubnet2"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRT"
+                }
+            }
+        },
+        "BastionSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "GroupName": "Bastion Server Security Group",
+                "GroupDescription": "RDP traffic",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 3389,
+                        "ToPort": 3389,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "WebServerInstance": {
+            "DependsOn": "AttachGateway",
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": "m5.xlarge",
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "VolumeSize": "120",
+                            "DeleteOnTermination": true,
+                            "Encrypted": true
+                        }
+                    }
+                ],
+                "NetworkInterfaces": [
+                    {
+                        "Description": "Primary network interface",
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "PublicSubnet1"
+                        },
+                        "AssociatePublicIpAddress": true,
+                        "GroupSet": [
+                            {
+                                "Ref": "WebServerSecurityGroup"
+                            }
+                        ]
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "<powershell>\nAdd-WindowsFeature Web-WebServer -includeAllSubFeature -logpath $env:temp\\Web-WebServer_feature.log \nAdd-WindowsFeature Web-Mgmt-Tools -includeAllSubFeature -logpath $env:temp\\Web-Mgmt-Tools_feature.log \nNew-Item -Path \"C:\\inetpub\" -Name \"WebApp\" -ItemType Directory \n$Url = \"https://drive.google.com/uc?id=141N2I7TH6HNivdFboKYkCkHol2Q7myE9&export=download\" \n$ExtractPath = \"C:\\inetpub\\WebApp\\WebApp\" \nInvoke-WebRequest -Uri $Url -OutFile (-join($ExtractPath,\".zip\")) \nExpand-Archive -LiteralPath \"C:\\inetpub\\WebApp\\WebApp.zip\" -DestinationPath \"C:\\inetpub\\WebApp\" \n$dbConn1 = Get-Content -Path \"C:\\inetpub\\WebApp\\WebApp-API\\appsettings.json\" \n$dbConnDB = $dbConn1 -replace \"DBXXX\", \"${MyDB.Endpoint.Address}\" \n$dbConnDB | Set-Content -Path \"C:\\inetpub\\WebApp\\WebApp-API\\appsettings.json\" \n$dbConn2 = Get-Content -Path \"C:\\inetpub\\WebApp\\WebApp-API\\appsettings.json\" \n$dbConnUser = $dbConn2 -replace \"USRXXX\", \"${DBUser}\" \n$dbConnUser | Set-Content -Path \"C:\\inetpub\\WebApp\\WebApp-API\\appsettings.json\" \n$dbConn3 = Get-Content -Path \"C:\\inetpub\\WebApp\\WebApp-API\\appsettings.json\" \n$dbConnPass = $dbConn3 -replace \"PSXXX\", \"${DBPassword}\" \n$dbConnPass | Set-Content -Path \"C:\\inetpub\\WebApp\\WebApp-API\\appsettings.json\" \n$html1 = Get-Content -Path \"C:\\inetpub\\WebApp\\WebApp-UI\\index.html\" \n$htmlSize = $html1 -replace \"XXsizeXX\", \"Large\" \n$htmlSize | Set-Content -Path \"C:\\inetpub\\WebApp\\WebApp-UI\\index.html\" \n$html2 = Get-Content -Path \"C:\\inetpub\\WebApp\\WebApp-UI\\index.html\" \n$htmlApp = $html2 -replace \"XXapp-specXX\", \"4 vCPUs, 16GB RAM, 120GB EBS\" \n$htmlApp | Set-Content -Path \"C:\\inetpub\\WebApp\\WebApp-UI\\index.html\" \n$html3 = Get-Content -Path \"C:\\inetpub\\WebApp\\WebApp-UI\\index.html\" \n$htmlDB = $html3 -replace \"XXdb-specXX\", \"8 vCPUs, 32GB RAM, 120GB EBS\" \n$htmlDB | Set-Content -Path \"C:\\inetpub\\WebApp\\WebApp-UI\\index.html\" \n$coreUrl = \"https://download.visualstudio.microsoft.com/download/pr/d97e0776-b316-4c41-a067-202eb027b968/e9694b0aa94e4b814f980f9ec3d3f400/dotnet-hosting-7.0.4-win.exe\" \n$outpath = \"C:\\Users\\Administrator\\Downloads\\dotnet-hosting-7.0.4-win.exe\" \nInvoke-WebRequest -Uri $coreUrl -OutFile $outpath \nStart-Process -Wait -FilePath $outpath -ArgumentList \"/s\" -PassThru \nNew-IISSite -Name WebAppAPI -BindingInformation \"*:5002:\" -PhysicalPath \"$env:systemdrive\\inetpub\\WebApp\\WebApp-API\" -Passthru \n$siteName = \"Default Web Site\" \n$site = Get-IISSite -Name $siteName \n$apps = $site.Applications \nForEach ($app In $apps) { Set-WebConfigurationProperty -PSPath \"MACHINE/WEBROOT/APPHOST/$site$($app.Path)\" -Filter \"system.webServer/directoryBrowse\" -Name \"enabled\" -Value \"True\" } \nGet-Website -Name \"Default Web Site\" \nSet-ItemProperty \"IIS:\\Sites\\Default Web Site\" -name physicalPath -value \"C:\\inetpub\\WebApp\\WebApp-UI\" \nNew-NetFirewallRule -DisplayName \"WebApp - Allow TCP Port 5002\" -Direction inbound -Profile Any -Action Allow -LocalPort 5002 -Protocol TCP \nNew-NetFirewallRule -DisplayName \"WebApp - Allow TCP Port 5002\" -Direction outbound -Profile Any -Action Allow -RemotePort 5002 -Protocol TCP \n</powershell>\n<script>\ncfn-init.exe -v -c setup -s ${AWS::StackId} -r WebServerInstance --region ${AWS::Region}\ncfn-signal.exe -e %ERRORLEVEL% \"\"</script>\n"
+                    }
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "ServerName"
+                        }
+                    }
+                ]
+            }
+        },
+        "WebServerEIP": {
+            "Type": "AWS::EC2::EIP",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "Domain": "vpc",
+                "InstanceId": {
+                    "Ref": "WebServerInstance"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "WebServer-EIP"
+                    }
+                ]
+            }
+        },
+        "WebServerSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "GroupDescription": "Allow access from HTTP, HTTPS from Anywhere and RDP from Bation Host",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 5002,
+                        "ToPort": 5002,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 3389,
+                        "ToPort": 3389,
+                        "SourceSecurityGroupId": {
+                            "Ref": "BastionSecurityGroup"
+                        }
+                    }
+                ]
+            }
+        },
+        "NewVolume": {
+            "Type": "AWS::EC2::Volume",
+            "DependsOn": "WebServerInstance",
+            "Properties": {
+                "Size": 60,
+                "VolumeType": "gp3",
+                "AvailabilityZone": {
+                    "Fn::GetAtt": [
+                        "WebServerInstance",
+                        "AvailabilityZone"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "BundleVolume"
+                    }
+                ]
+            },
+            "DeletionPolicy": "Snapshot"
+        },
+        "MountPoint": {
+            "Type": "AWS::EC2::VolumeAttachment",
+            "DependsOn": "NewVolume",
+            "Properties": {
+                "InstanceId": {
+                    "Ref": "WebServerInstance"
+                },
+                "VolumeId": {
+                    "Ref": "NewVolume"
+                },
+                "Device": "/dev/sdh"
+            }
+        },
+        "MyDB": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "AllocatedStorage": "120",
+                "DBInstanceClass": "db.m5.2xlarge",
+                "LicenseModel": "license-included",
+                "Engine": "sqlserver-se",
+                "MasterUsername": {
+                    "Ref": "DBUser"
+                },
+                "MasterUserPassword": {
+                    "Ref": "DBPassword"
+                },
+                "DBSubnetGroupName": {
+                    "Ref": "SubnetGroup"
+                },
+                "VPCSecurityGroups": [
+                    {
+                        "Ref": "DbServerSecurityGroup"
+                    }
+                ]
+            }
+        },
+        "SubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupName": {
+                    "Fn::Sub": "${AWS::StackName}-database-subnet-group"
+                },
+                "DBSubnetGroupDescription": "Subnet Group",
+                "SubnetIds": [
+                    {
+                        "Ref": "PrivateSubnet1"
+                    },
+                    {
+                        "Ref": "PrivateSubnet2"
+                    }
+                ]
+            }
+        },
+        "DbServerSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "GroupName": "DB Server Security Group",
+                "GroupDescription": "Allow access from Web Server only",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 1433,
+                        "ToPort": 1433,
+                        "SourceSecurityGroupId": {
+                            "Ref": "WebServerSecurityGroup"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "InstanceId of the newly created EC2 instance",
+            "Value": {
+                "Ref": "WebServerInstance"
+            }
+        },
+        "AZ": {
+            "Description": "Availability Zone of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebServerInstance",
+                    "AvailabilityZone"
+                ]
+            }
+        },
+        "PublicDNS": {
+            "Description": "Public DNSName of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebServerInstance",
+                    "PublicDnsName"
+                ]
+            }
+        },
+        "PublicIP": {
+            "Description": "Public IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebServerInstance",
+                    "PublicIp"
+                ]
+            }
+        },
+        "PrivateDNS": {
+            "Description": "Private DNSName of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebServerInstance",
+                    "PrivateDnsName"
+                ]
+            }
+        },
+        "PrivateIP": {
+            "Description": "Private IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebServerInstance",
+                    "PrivateIp"
+                ]
+            }
+        },
+        "JDBCConnectionString": {
+            "Description": "Endpoint connection string for the database",
+            "Value": {
+                "Fn::Sub": "${MyDB.Endpoint.Address}:${MyDB.Endpoint.Port}"
+            }
+        },
+        "WebAppAddress": {
+            "Description": "Public IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::Sub": "http://${WebServerInstance.PublicIp}"
+            }
+        }
+    }
+}

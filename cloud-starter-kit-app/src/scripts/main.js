@@ -22,8 +22,8 @@ if (require('electron-squirrel-startup')) app.quit();
 
 process.env.ELECTRON_NO_ATTACH_CONSOLE = true;
 
-process.env.CONFIG_HOST = 'admin.cloud-starter-kit.com';
-process.env.ADMIN_HOST = 'admin.cloud-starter-kit.com';
+process.env.CONFIG_HOST = 'admin.cskingrammicro.com.au';
+process.env.ADMIN_HOST = 'admin.cskingrammicro.com.au';
 process.env.FILE_HOST = 'kits.cloud-starter-kit.com';
 
 const HOSTS = {

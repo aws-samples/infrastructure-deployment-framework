@@ -1,0 +1,262 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Bundle for a Secure Storage (Trend Micro File Storage Security scanner and storage stacks)",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "[ CloudOne File Storage Security section ]"
+                    },
+                    "Parameters": [
+                        "S3bucketname",
+                        "CloudOneRegion",
+                        "CloudOneID"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "CloudOneRegion": {
+                    "default": "Trend Micro Cloud One region"
+                },
+                "CloudOneID": {
+                    "default": "CloudOneID"
+                },
+                "TriggerWithObjectCreatedEvent": {
+                    "default": "TriggerWithObjectCreatedEvent"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "S3bucketname": {
+            "Description": "Bucket Name. It must be unique, all letter should be in lowercase and avoid special caracters",
+            "Type": "String"
+        },
+        "CloudOneRegion": {
+            "Description": "The region of the Trend Micro Cloud One services.",
+            "Type": "String",
+            "AllowedValues": [
+                "sg-1",
+                "us-1",
+                "gb-1",
+                "de-1",
+                "au-1",
+                "ca-1",
+                "jp-1"
+            ],
+            "Default": "us-1"
+        },
+        "CloudOneID": {
+            "Description": "The CloudOne ID is for future use with updating Lambdas and also to address and prevent the 'confused deputy' problem.",
+            "Type": "String"
+        }
+    },
+    "Conditions": {
+        "IsScanOnGetObjectEnabled": {
+            "Fn::Equals": [
+                "true",
+                "true"
+            ]
+        }
+    },
+    "Resources": {
+        "S3Bucket": {
+            "Type": "AWS::S3::Bucket",
+            "Description": "Creating Amazon S3 bucket from CloudFormation",
+            "Properties": {
+                "BucketName": {
+                    "Ref": "S3bucketname"
+                }
+            }
+        },
+        "S3BucketQuarantine": {
+            "Type": "AWS::S3::Bucket",
+            "Description": "Creating Amazon S3 bucket for Quarantine",
+            "Properties": {
+                "BucketName": {
+                    "Fn::Sub": [
+                        "quarantine${Param1}",
+                        {
+                            "Param1": {
+                                "Fn::Select": [
+                                    4,
+                                    {
+                                        "Fn::Split": [
+                                            "-",
+                                            {
+                                                "Fn::Select": [
+                                                    2,
+                                                    {
+                                                        "Fn::Split": [
+                                                            "/",
+                                                            {
+                                                                "Ref": "AWS::StackId"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "StorageStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "AdditionalIAMPolicies": "",
+                    "BucketListenerDLQARN": "",
+                    "CloudOneRegion": {
+                        "Ref": "CloudOneRegion"
+                    },
+                    "ExternalID": {
+                        "Ref": "CloudOneID"
+                    },
+                    "FSSBucketName": "file-storage-security",
+                    "FSSKeyPrefix": "latest/",
+                    "IAMPolicyPrefix": "",
+                    "IAMRolePrefix": "",
+                    "KMSKeyARNForBucketSSE": "",
+                    "KMSKeyARNForDLQSSE": "",
+                    "KMSKeyARNForQueueSSE": "",
+                    "KMSKeyARNForTopicSSE": "",
+                    "LambdaFunctionPrefix": "",
+                    "NetworkProxy": "",
+                    "ObjectFilterPrefix": "",
+                    "PermissionsBoundary": "",
+                    "PostScanActionTagDLQARN": "",
+                    "ReportObjectKey": "true",
+                    "S3BucketToScan": {
+                        "Ref": "S3Bucket"
+                    },
+                    "ScannerAWSAccount": {
+                        "Ref": "AWS::AccountId"
+                    },
+                    "ScannerLambdaAliasARN": {
+                        "Fn::GetAtt": [
+                            "ScannerStack",
+                            "Outputs.ScannerLambdaAliasARN"
+                        ]
+                    },
+                    "ScannerSQSURL": {
+                        "Fn::GetAtt": [
+                            "ScannerStack",
+                            "Outputs.ScannerQueueURL"
+                        ]
+                    },
+                    "ScanOnGetObject": "false",
+                    "ScanResultTopicDLQARN": "",
+                    "SecurityGroupIDs": "",
+                    "SNSTopicPrefix": "",
+                    "SubnetIDs": "",
+                    "TrendMicroManagementAccount": "415485722356",
+                    "TriggerWithObjectCreatedEvent": "true"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "FSS-Storage-Stack"
+                    }
+                ],
+                "TemplateURL": {
+                    "Fn::Sub": "https://file-storage-security-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/templates/FSS-Storage-Stack.template"
+                },
+                "TimeoutInMinutes": 30
+            }
+        },
+        "ScannerStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "AdditionalIAMPolicies": "",
+                    "CloudOneRegion": {
+                        "Ref": "CloudOneRegion"
+                    },
+                    "ExternalID": {
+                        "Ref": "CloudOneID"
+                    },
+                    "FSSBucketName": "file-storage-security",
+                    "FSSKeyPrefix": "latest/",
+                    "IAMPolicyPrefix": "",
+                    "IAMRolePrefix": "",
+                    "KMSKeyARNForQueueSSE": "",
+                    "KMSKeyARNsForTopicSSE": "",
+                    "LambdaFunctionPrefix": "",
+                    "LambdaLayerPrefix": "",
+                    "NetworkProxy": "",
+                    "PermissionsBoundary": "",
+                    "ScannerEphemeralStorage": 512,
+                    "SecurityGroupIDs": "",
+                    "SQSQueuePrefix": "",
+                    "SubnetIDs": "",
+                    "TrendMicroManagementAccount": "415485722356"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "FSS-Scanner-Stack"
+                    }
+                ],
+                "TemplateURL": {
+                    "Fn::Sub": "https://file-storage-security-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/templates/FSS-Scanner-Stack.template"
+                },
+                "TimeoutInMinutes": 30
+            }
+        },
+        "PostScanStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ScanningBucketName": {
+                        "Ref": "S3Bucket"
+                    },
+                    "ScanResultTopicARN": {
+                        "Fn::GetAtt": [
+                            "StorageStack",
+                            "Outputs.ScanResultTopicARN"
+                        ]
+                    },
+                    "QuarantineBucketName": {
+                        "Ref": "S3BucketQuarantine"
+                    }
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "FSS-PostScan-Stack"
+                    }
+                ],
+                "TemplateURL": {
+                    "Fn::Sub": "https://cloudone-filestoragesecurity-template.s3.ap-southeast-1.amazonaws.com/FSS-PostScan.yml"
+                },
+                "TimeoutInMinutes": 30
+            }
+        }
+    },
+    "Outputs": {
+        "ScannerStackManagementRoleARN": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "ScannerStack",
+                    "Outputs.ScannerStackManagementRoleARN"
+                ]
+            },
+            "Description": "The ARN of the IAM role for File Storage Security backend services to manage the deployed resources."
+        },
+        "StorageStackManagementRoleARN": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "StorageStack",
+                    "Outputs.StorageStackManagementRoleARN"
+                ]
+            },
+            "Description": "The ARN of the IAM role for File Storage Security backend services to manage the deployed resources."
+        }
+    }
+}

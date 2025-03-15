@@ -1,0 +1,8 @@
+{
+    "hosted_zone": "development.cskingrammicro.com.au",
+    "hosted_zone_id": "Z02901212UK8UP50YMXIB",
+    "environment": "dev",
+    "user_pool_id": "us-east-1_o8MMlyVwT",
+    "user_pool_client_id": "57vtbjbtmemavo101hu46o3516",
+    "admin_email_domain": "cskingrammicro.com.au"
+}

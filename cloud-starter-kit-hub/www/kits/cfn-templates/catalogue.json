@@ -10,19 +10,39 @@
                     "Templates": [
                         "management-governance.json"
                     ],
-                    "VpcRequired": false,
-                    "Copyright": "© Guy Morton 2024",
-                    "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+                    "VpcRequired": false
                 },
                 {
-                    "Name": "My New Kit",
-                    "Description": "This kit something interesting and useful.",
+                    "Name": "WAF - Web Application Firewall Bundle",
+                    "Description": "This kit deploys Protection against common application vulnerabilities or other unwanted traffic. <br>1. Protection from malicious traffic that increases resource consumption <br>2. Protection from XSS attacks <br>3. (Optional) Protection from bots and DDoS attacks <br>4. (Optional) Protection from SQL Injection attacks <br>5.  Protection from PHP/WordPress attacks <br>6. Centralized WAF logging and monitoring",
                     "Templates": [
-                        "new-kit.json"
+                        "WAF_Bundle_basic.json"
                     ],
-                    "VpcRequired": false,
-                    "Copyright": "",
-                    "MoreInfo": ""
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Secure Storage Bundle",
+                    "Description": "This kit deploys 1 X S3 Bucket.<br>1. Deployable in existing networks in AWS or new networks (Network Bundle) <br>2. Trend Micro Cloud One integrated with the Bucket",
+                    "Templates": [
+                        "Secure-Storage.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Cloudwatch Bundle",
+                    "Description": "This kit deploys basic configuration and setup for cloudwatch dashboard. This creates a cloudwatch alarm to monitor cpu utilization that exceeds 70% for 5 minutes",
+                    "Templates": [
+                        "cloudformation_config_cloudtrail.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Palo Alto Firewall",
+                    "Description": "This kit deploys deploys a Palo Alto firewall with BYOL and DNS hostnames enabled",
+                    "Templates": [
+                        "PA8.json"
+                    ],
+                    "VpcRequired": false
                 }
             ]
         },
@@ -36,9 +56,7 @@
                     "Templates": [
                         "cost-management.json"
                     ],
-                    "VpcRequired": false,
-                    "Copyright": "© Guy Morton 2024",
-                    "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+                    "VpcRequired": false
                 }
             ]
         },
@@ -59,6 +77,177 @@
             ]
         },
         {
+            "TopLevelCategory": "Foundations",
+            "Category": "Networking",
+            "Kits": [
+                {
+                    "Name": "Network Bundle",
+                    "Description": "This kit deploys 2 x  Public Subnets in 2 Data centers.<br>2 x  Private Subnets behind a Router with NAT Capabilities.<br> 2 x Private Subnets with no exposure to the internet.<br>1 x Bastion Subnet.<br>1 x Bastion Host/Jump Server",
+                    "Templates": [
+                        "vpc.json"
+                    ],
+                    "VpcRequired": false
+                }				
+            ]
+        },
+        {
+           "TopLevelCategory": "Basic Components",
+		   "Category": "Virtual Machines",
+            "Kits": [
+                {
+                    "Name": "Ubuntu Virtual Machine Bundle",
+                    "Description": "This kit deploys 1 x Virtual Machine (Ubuntu)<br>You can choose from 3 sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br> 1. Pre-configured host based firewall to allow RDP <br>2. Deployable in existing networks in AWS or new networks (Network Bundle)",
+                    "Templates": [
+                        "Ec2-ubuntu.json"
+                    ],
+					"AmiFilter": "Ubuntu",
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Windows Virtual Machine Bundle",
+                    "Description": "This kit deploys 1 x Virtual Machine (Windows)<br>You can choose from 3 sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br> 1. Pre-configured host based firewall to allow RDP <br>2. Deployable in existing networks in AWS or new networks (Network Bundle)",
+                    "Templates": [
+                        "Ec2-windows.json"
+                    ],
+					"AmiFilter": "Windows",
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Active Directory Bundle",
+                    "Description": "This kit deploys new Active Directory Setup in AWS. It deploys 1 x Virtual Machine (Windows/Ubuntu)<br>You can choose from 3 sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br> 1. Pre-configured host based firewall to allow RDP <br>2. Deployable in existing networks in AWS or new networks (Network Bundle)",
+                    "Templates": [
+                        "EC2-AD.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Active Directory Domain Controller Bundle",
+                    "Description": "This kit deploys new Active Directory Domain Controller Setup in AWS. It deploys 1 x Virtual Machine (Windows/Ubuntu)<br>You can choose from 3 sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br> 1. Pre-configured host based firewall to allow RDP <br>2. Deployable in existing networks in AWS or new networks (Network Bundle). <br> 3. ADDS roles and services configured and installed. <br> 4. Automatically joined to your AD Domain",
+                    "Templates": [
+                        "EC2-Add-DC.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Bundle - Windows and MSSQL Large",
+                    "Description": "This kit deploys WebApp Windows & MS SQL - large ",
+                    "Templates": [
+                        "WebAppDB-Windows-L.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Bundle - Windows and MSSQL Medium",
+                    "Description": "This kit deploys WebApp Windows & MS SQL - Medium ",
+                    "Templates": [
+                        "WebAppDB-Windows-M.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Bundle - Windows and MSSQL Small",
+                    "Description": "This kit deploys WebApp Windows & MS SQL - Small ",
+                    "Templates": [
+                        "WebAppDB-Windows-S.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Ubuntu Bundle - Large",
+                    "Description": "This kit deploys Ubuntu large machine",
+                    "Templates": [
+                        "WebHosting-Ubuntu-L.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Ubuntu Bundle - Medium",
+                    "Description": "This kit deploys Ubuntu medium machine",
+                    "Templates": [
+                        "WebHosting-Ubuntu-M.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Ubuntu Bundle - Small",
+                    "Description": "This kit deploys Ubuntu Small machine",
+                    "Templates": [
+                        "WebHosting-Ubuntu-S.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Windows Bundle - Large",
+                    "Description": "This kit deploys Windows large machine",
+                    "Templates": [
+                        "WebHosting-Windows-L.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Windows Bundle - Medium",
+                    "Description": "This kit deploys Windows medium machine",
+                    "Templates": [
+                        "WebHosting-Windows-M.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Web Hosting Windows Bundle - Small",
+                    "Description": "This kit deploys Windows small machine",
+                    "Templates": [
+                        "WebHosting-Windows-S.json"
+                    ],
+                    "VpcRequired": false
+                }
+            ]
+        },
+        {
+           "TopLevelCategory": "Basic Components",
+		   "Category": "Databases",
+            "Kits": [
+                {
+                    "Name": "Relational Database Bundle - MSSQL",
+                    "Description": "This kit deploys 1 x Managed Database Server (MSSQL). <br>You can choose from 3 database server sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br>1. Pre-configured host based firewall to allow connection on the database <br>2. Deployable in existing networks in AWS or new networks (Network Bundle) ",
+                    "Templates": [
+                        "DB-MSSQL.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Relational Database Bundle - MYSQL",
+                    "Description": "This kit deploys 1 x Managed Database Server (MySQL). <br>You can choose from 3 database server sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br>1. Pre-configured host based firewall to allow connection on the database <br>2. Deployable in existing networks in AWS or new networks (Network Bundle) ",
+                    "Templates": [
+                        "DB-MySQL.json"
+                    ],
+                    "VpcRequired": false
+                },
+				{
+                    "Name": "Relational Database Bundle - PostgreSQL",
+                    "Description": "This kit deploys 1 x Managed Database Server (PostgreSQL). <br>You can choose from 3 database server sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br>1. Pre-configured host based firewall to allow connection on the database <br>2. Deployable in existing networks in AWS or new networks (Network Bundle) ",
+                    "Templates": [
+                        "DB-PostgreSQL.json"
+                    ],
+                    "VpcRequired": false
+                }
+				
+            ]
+        },
+        {
+           "TopLevelCategory": "Common Patterns",
+		   "Category": "Backup",
+            "Kits": [
+                {
+                    "Name": "Veeam Backup Bundle",
+                    "Description": "This kit deploys Veeam Backup for AWS Server",
+                    "Templates": [
+                        "Veeam aws v1.json"
+                    ],
+                    "VpcRequired": false
+                }				
+            ]
+        },
+        {
             "TopLevelCategory": "Advanced Solutions",
             "Category": "Generative AI",
             "Kits": [
@@ -72,7 +261,7 @@
                     "Copyright": "",
                     "MoreInfo": ""
                 }
-            ]
-        }
+		            ]
+	    }        
     ]
 }

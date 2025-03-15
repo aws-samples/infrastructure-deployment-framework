@@ -1,0 +1,8 @@
+{
+    "hosted_zone": "staging.cskingrammicro.com.au",
+    "hosted_zone_id": "Z09468012PKYRB0F8JBDR",
+    "environment": "staging",
+    "user_pool_id": "us-east-1_8joL5VP1g",
+    "user_pool_client_id": "1afgvilevmhe7s6c048jc6q4nc",
+    "admin_email_domain": "cskingrammicro.com.au"
+}

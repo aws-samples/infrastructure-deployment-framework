@@ -1,0 +1,245 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Bundle for a Windows Virtual Machine",
+    "Metadata": {
+        "License": "Apache-2.0",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Virtual Machine Server Details"
+                    },
+                    "Parameters": [
+                        "ServerName",
+                        "VMInstanceType",
+                        "LatestAmiId",
+                        "KeyName"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Virtual Machine Server Networking"
+                    },
+                    "Parameters": [
+                        "myVPC",
+                        "SubnetID",
+                        "RDPLocation"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "ServerName": {
+                    "default": "Key in the Virtual Machine name"
+                },
+                "VMInstanceType": {
+                    "default": "Select the Virtual Machine size"
+                },
+                "LatestAmiId": {
+                    "default": "Virtual Machine AMI"
+                },
+                "KeyName": {
+                    "default": "Select the key-pair that will be used to RDP to the Virtual Machine"
+                },
+                "myVPC": {
+                    "default": "Which VPC should this be deployed to?"
+                },
+                "SubnetID": {
+                    "default": "What is the Subnet ID in which this Domain Controller should be deployed in?"
+                },
+                "RDPLocation": {
+                    "default": "Key in the RDP source IP - Recommended to be the IP of a Bastion Host"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "ServerName": {
+            "Description": "Please provide a server name",
+            "Type": "String"
+        },
+        "VMInstanceType": {
+            "Description": "WebServer EC2 instance type (for SMALL server use t3.medium, for a MEDIUM server use m5.large, for a LARGE server use m5.xlarge)",
+            "Type": "String",
+            "ConstraintDescription": "must be a valid EC2 instance type",
+            "Default": "t3.medium"
+        },
+        "LatestAmiId": {
+            "Description": "The latest Windows OS",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+            "AllowedValues": [
+                "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+                "/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base",
+                "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base"
+            ],
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair"
+        },
+        "myVPC": {
+            "Description": "The VPC ID where the instance is going to be deployed",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "SubnetID": {
+            "Description": "The SubnetID where this instance is going to be deployed",
+            "Type": "AWS::EC2::Subnet::Id",
+            "ConstraintDescription": "must be the ID of an existing subnet"
+        },
+        "RDPLocation": {
+            "Description": "The IP address range that can be used to RDP to the Virtual Machine",
+            "Type": "String",
+            "MinLength": 9,
+            "MaxLength": 18,
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x",
+            "Default": "0.0.0.0/0"
+        }
+    },
+    "Resources": {
+        "EC2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "VMInstanceType"
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "NetworkInterfaces": [
+                    {
+                        "Description": "Primary network interface",
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "SubnetID"
+                        },
+                        "AssociatePublicIpAddress": true,
+                        "GroupSet": [
+                            {
+                                "Ref": "InstanceSecurityGroup"
+                            }
+                        ]
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "ServerName"
+                        }
+                    }
+                ]
+            }
+        },
+        "InstanceSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "GroupDescription": "Enable RDP access via port 3389",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 3389,
+                        "ToPort": 3389,
+                        "CidrIp": {
+                            "Ref": "RDPLocation"
+                        }
+                    }
+                ]
+            }
+        },
+        "NewVolume": {
+            "Type": "AWS::EC2::Volume",
+            "DependsOn": "EC2Instance",
+            "Properties": {
+                "Size": 50,
+                "VolumeType": "gp3",
+                "AvailabilityZone": {
+                    "Fn::GetAtt": [
+                        "EC2Instance",
+                        "AvailabilityZone"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "BundleVolume"
+                    }
+                ]
+            },
+            "DeletionPolicy": "Snapshot"
+        },
+        "MountPoint": {
+            "Type": "AWS::EC2::VolumeAttachment",
+            "DependsOn": "NewVolume",
+            "Properties": {
+                "InstanceId": {
+                    "Ref": "EC2Instance"
+                },
+                "VolumeId": {
+                    "Ref": "NewVolume"
+                },
+                "Device": "/dev/sdh"
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "InstanceId of the newly created EC2 instance",
+            "Value": {
+                "Ref": "EC2Instance"
+            }
+        },
+        "AZ": {
+            "Description": "Availability Zone of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "AvailabilityZone"
+                ]
+            }
+        },
+        "PublicDNS": {
+            "Description": "Public DNSName of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PublicDnsName"
+                ]
+            }
+        },
+        "PublicIP": {
+            "Description": "Public IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PublicIp"
+                ]
+            }
+        },
+        "PrivateDNS": {
+            "Description": "Private DNSName of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PrivateDnsName"
+                ]
+            }
+        },
+        "PrivateIP": {
+            "Description": "Private IP address of the newly created EC2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance",
+                    "PrivateIp"
+                ]
+            }
+        }
+    }
+}

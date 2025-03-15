@@ -1,0 +1,175 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Distribution Bundle for MySQL AWS RDS",
+    "Metadata": {
+        "License": "Apache-2.0",
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "DB Instance Details"
+                    },
+                    "Parameters": [
+                        "DBInstanceType"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "DB Instance Networking"
+                    },
+                    "Parameters": [
+                        "myVPC",
+                        "SubnetA",
+                        "SubnetB",
+                        "ConnectionLocation"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "DB Configuration"
+                    },
+                    "Parameters": [
+                        "DBName",
+                        "DBUser",
+                        "DBPassword"
+                    ]
+                }
+            ]
+        }
+    },
+    "Parameters": {
+        "DBInstanceType": {
+            "Description": "Database instance type (for SMALL server use db.t3.medium, for a MEDIUM server use db.m5.large, for a LARGE server use db.m5.xlarge)",
+            "Type": "String",
+            "AllowedValues": [
+                "db.t3.medium",
+                "db.m5.large",
+                "db.m5.xlarge"
+            ],
+            "Default": "db.t3.medium"
+        },
+        "myVPC": {
+            "Description": "The VPC ID where the instance is going to be deployed",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "SubnetA": {
+            "Description": "First Subnet ID where the database can reside",
+            "Type": "AWS::EC2::Subnet::Id",
+            "ConstraintDescription": "must be the ID of an existing subnet"
+        },
+        "SubnetB": {
+            "Description": "Second Subnet ID where the database can reside",
+            "Type": "AWS::EC2::Subnet::Id",
+            "ConstraintDescription": "must be the ID of an existing subnet"
+        },
+        "ConnectionLocation": {
+            "Description": "The source IP used to connect to the Database",
+            "Type": "String",
+            "MinLength": 9,
+            "MaxLength": 18,
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x",
+            "Default": "0.0.0.0/0"
+        },
+        "DBName": {
+            "Description": "The database name",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 64,
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters",
+            "Default": "MyDatabase"
+        },
+        "DBUser": {
+            "Description": "The database admin account username",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 16,
+            "NoEcho": "true",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters"
+        },
+        "DBPassword": {
+            "Description": "The database admin account password",
+            "Type": "String",
+            "MinLength": 8,
+            "MaxLength": 41,
+            "NoEcho": "true",
+            "AllowedPattern": "[a-zA-Z0-9]*",
+            "ConstraintDescription": "must contain only alphanumeric characters"
+        }
+    },
+        "Resources": {
+        "MyDB": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "DBName": {
+                    "Ref": "DBName"
+                },
+                "AllocatedStorage": "50",
+                "DBInstanceClass": {
+                    "Ref": "DBInstanceType"
+                },
+                "Engine": "mysql",
+                "MasterUsername": {
+                    "Ref": "DBUser"
+                },
+                "MasterUserPassword": {
+                    "Ref": "DBPassword"
+                },
+                "DBSubnetGroupName": {
+                    "Ref": "SubnetGroup"
+                },
+                "VPCSecurityGroups": [
+                    {
+                        "Ref": "DatabaseSecurityGroup"
+                    }
+                ]
+            }
+        },
+        "SubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupName": {
+                    "Fn::Sub": "${AWS::StackName}-database-subnet-group"
+                },
+                "DBSubnetGroupDescription": "Subnet Group",
+                "SubnetIds": [
+                    {
+                        "Ref": "SubnetA"
+                    },
+                    {
+                        "Ref": "SubnetB"
+                    }
+                ]
+            }
+        },
+        "DatabaseSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVPC"
+                },
+                "GroupDescription": "Enable access via Port 3306",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 3306,
+                        "ToPort": 3306,
+                        "CidrIp": {
+                            "Ref": "ConnectionLocation"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "JDBCConnectionString": {
+            "Description": "Endpoint connection string for the database",
+            "Value": {
+                "Fn::Sub": "jdbc:mysql://${MyDB.Endpoint.Address}:${MyDB.Endpoint.Port}/${DBName}"
+            }
+        }
+    }
+}

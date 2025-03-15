@@ -1,0 +1,1143 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Veeam Cloud Backup for AWS CloudFormation template: Configure VCB instance. **WARNING** This template creates an Amazon Ec2 Instance with an IAM Role. You will be billed for the AWS resources used if you create a stack from this template.",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Instance Configuration"
+                    },
+                    "Parameters": [
+                        "VMInstanceType",
+                        "KeyName"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Network Configuration"
+                    },
+                    "Parameters": [
+                        "CreateEIP",
+                        "HTTPLocation"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "VPC and Subnet"
+                    },
+                    "Parameters": [
+                        "VpcCidr",
+                        "SubnetCidr"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "VMInstanceType": {
+                    "default": "Instance type for Veeam Backup for AWS server"
+                },
+                "KeyName": {
+                    "default": "Key pair for Veeam Backup for AWS server"
+                },
+                "CreateEIP": {
+                    "default": "Create elastic IP for Veeam Backup for AWS server?"
+                },
+                "HTTPLocation": {
+                    "default": "Allowed source IP addresses for connection to HTTPS"
+                },
+                "VpcCidr": {
+                    "default": "VPC CIDR"
+                },
+                "SubnetCidr": {
+                    "default": "Subnet CIDR"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "KeyName": {
+            "Description": "Select one, or create a new one at AWS console",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        },
+        "VMInstanceType": {
+            "Description": "",
+            "Type": "String",
+            "Default": "t3.medium",
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "CreateEIP": {
+            "Description": "By default a dynamic IP will be created (and it could change during reboots of this instance)",
+            "Default": false,
+            "Type": "String",
+            "AllowedValues": [
+                true,
+                false
+            ]
+        },
+        "HTTPLocation": {
+            "Description": "The IP address range in CIDR format (e.g. 12.23.34.0/24) from which Veeam Backup for AWS Management portal will be accessible",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x"
+        },
+        "VpcCidr": {
+            "Description": "Enter the CIDR value of your network in AWS",
+            "Type": "String",
+            "Default": "173.0.0.0/16"
+        },
+        "SubnetCidr": {
+            "Description": "Enter the CIDR value of your subnet in AWS",
+            "Type": "String",
+            "Default": "173.0.1.0/24"
+        }
+    },
+    "Mappings": {
+        "RegionMap": {
+            "us-east-1": {
+                "HVM64": "ami-0080d5dc2ebd92bf4"
+            },
+            "us-east-2": {
+                "HVM64": "ami-0714b94769c7e908a"
+            },
+            "us-west-1": {
+                "HVM64": "ami-002cf06e81b5ce794"
+            },
+            "us-west-2": {
+                "HVM64": "ami-040af1e125000b2d1"
+            },
+            "af-south-1": {
+                "HVM64": "ami-0cececfbc24009656"
+            },
+            "ap-south-1": {
+                "HVM64": "ami-05bde69f106740c8a"
+            },
+            "ap-south-2": {
+                "HVM64": "ami-0eb9ee172891339ef"
+            },
+            "ap-northeast-2": {
+                "HVM64": "ami-0e5d1a2061e3e6ca6"
+            },
+            "ap-southeast-1": {
+                "HVM64": "ami-0a54eced8f7293d68"
+            },
+            "ap-southeast-2": {
+                "HVM64": "ami-0ffa20f16716f4318"
+            },
+            "ap-southeast-3": {
+                "HVM64": "ami-0f2a8f89057eafadc"
+            },
+            "ap-southeast-4": {
+                "HVM64": "ami-09da1609614a18642"
+            },
+            "ap-northeast-1": {
+                "HVM64": "ami-0910eab67428f222b"
+            },
+            "ca-central-1": {
+                "HVM64": "ami-0d3ae080411456061"
+            },
+            "eu-central-1": {
+                "HVM64": "ami-0d381befae8b95965"
+            },
+            "eu-central-2": {
+                "HVM64": "ami-093cb771240dc5f92"
+            },
+            "eu-west-1": {
+                "HVM64": "ami-0f0833f1ef827d161"
+            },
+            "eu-west-2": {
+                "HVM64": "ami-0100eb0352777d435"
+            },
+            "eu-south-1": {
+                "HVM64": "ami-0f7b1d366b2406855"
+            },
+            "eu-south-2": {
+                "HVM64": "ami-00b6aed2d31e3385f"
+            },
+            "eu-west-3": {
+                "HVM64": "ami-0c01ef9a8991269fb"
+            },
+            "eu-north-1": {
+                "HVM64": "ami-01743137f2b8fefc5"
+            },
+            "sa-east-1": {
+                "HVM64": "ami-04f8b7b97081b2395"
+            },
+            "me-central-1": {
+                "HVM64": "ami-059ac269f50f89b4a"
+            },
+            "me-south-1": {
+                "HVM64": "ami-046e0f1749fd5c3e8"
+            },
+            "ap-east-1": {
+                "HVM64": "ami-02a211fde161d77f7"
+            },
+            "ap-northeast-3": {
+                "HVM64": "ami-0360d8300bbcc9e41"
+            },
+            "us-gov-east-1": {
+                "HVM64": "ami-002aff98490491993"
+            },
+            "us-gov-west-1": {
+                "HVM64": "ami-053ed6f75a760b8ec"
+            }
+        }
+    },
+    "Conditions": {
+        "CreateEIPCond": {
+            "Fn::Equals": [
+                {
+                    "Ref": "CreateEIP"
+                },
+                "true"
+            ]
+        },
+        "IsGovCloud": {
+            "Fn::Or": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "us-gov-east-1"
+                    ]
+                },
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "us-gov-west-1"
+                    ]
+                }
+            ]
+        }
+    },
+    "Resources": {
+        "VcbRebootAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Trigger a reboot when instance status check fails for 3 consecutive minutes.",
+                "Namespace": "AWS/EC2",
+                "MetricName": "StatusCheckFailed_Instance",
+                "Statistic": "Minimum",
+                "Period": "60",
+                "EvaluationPeriods": "3",
+                "ComparisonOperator": "GreaterThanThreshold",
+                "Threshold": "0",
+                "AlarmActions": [
+                    {
+                        "Fn::Sub": [
+                            "arn:${Param1}:automate:${AWS::Region}:ec2:reboot",
+                            {
+                                "Param1": {
+                                    "Fn::If": [
+                                        "IsGovCloud",
+                                        "aws-us-gov",
+                                        "aws"
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "InstanceId",
+                        "Value": {
+                            "Ref": "VcbEc2Instance"
+                        }
+                    }
+                ]
+            }
+        },
+        "VcbRecoveryAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Trigger a recovery when system status check fails for 15 consecutive minutes.",
+                "Namespace": "AWS/EC2",
+                "MetricName": "StatusCheckFailed_System",
+                "Statistic": "Minimum",
+                "Period": "60",
+                "EvaluationPeriods": "2",
+                "ComparisonOperator": "GreaterThanThreshold",
+                "Threshold": "0",
+                "AlarmActions": [
+                    {
+                        "Fn::Sub": [
+                            "arn:${Param1}:automate:${AWS::Region}:ec2:recover",
+                            {
+                                "Param1": {
+                                    "Fn::If": [
+                                        "IsGovCloud",
+                                        "aws-us-gov",
+                                        "aws"
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "InstanceId",
+                        "Value": {
+                            "Ref": "VcbEc2Instance"
+                        }
+                    }
+                ]
+            }
+        },
+        "VcbLifecyclePolicy": {
+            "Type": "AWS::DLM::LifecyclePolicy",
+            "Properties": {
+                "Description": "Lifecycle Policy for a Veeam Cloud Backup instance",
+                "State": "ENABLED",
+                "ExecutionRoleArn": {
+                    "Fn::GetAtt": [
+                        "VcbSnapshotsRole",
+                        "Arn"
+                    ]
+                },
+                "PolicyDetails": {
+                    "ResourceTypes": [
+                        "INSTANCE"
+                    ],
+                    "TargetTags": [
+                        {
+                            "Key": "aws:cloudformation:stack-name",
+                            "Value": {
+                                "Ref": "AWS::StackName"
+                            }
+                        }
+                    ],
+                    "Schedules": [
+                        {
+                            "Name": "Vcb instance daily snapshots",
+                            "TagsToAdd": [
+                                {
+                                    "Key": "type",
+                                    "Value": "VcbDailySnapshot"
+                                }
+                            ],
+                            "CreateRule": {
+                                "Interval": 12,
+                                "IntervalUnit": "HOURS",
+                                "Times": [
+                                    "03:00"
+                                ]
+                            },
+                            "RetainRule": {
+                                "Count": 1
+                            },
+                            "CopyTags": true
+                        }
+                    ]
+                }
+            }
+        },
+        "VeeamInstanceBackupRestoreAccessPolicy01": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "elasticloadbalancing:SetSecurityGroups",
+                                "elasticloadbalancing:SetSubnets",
+                                "elasticloadbalancing:RemoveTags",
+                                "elasticloadbalancing:AddTags",
+                                "ram:CreateResourceShare",
+                                "ram:DeleteResourceShare",
+                                "ec2:CreateDefaultVpc",
+                                "ec2:CreateDefaultSubnet",
+                                "ec2:CreateNatGateway",
+                                "ec2:CreateSecurityGroup",
+                                "ec2:DeleteSecurityGroup",
+                                "ec2:CreateDhcpOptions",
+                                "ec2:DeleteDhcpOptions",
+                                "ec2:DeleteEgressOnlyInternetGateway",
+                                "ec2:DeleteManagedPrefixList",
+                                "ec2:DeleteVpcEndpoints",
+                                "ec2:DeleteTransitGatewayPrefixListReference",
+                                "ec2:CreateTransitGatewayPrefixListReference",
+                                "s3:ListAllMyBuckets",
+                                "s3:ListBucket",
+                                "s3:GetBucketLocation",
+                                "s3:PutObject",
+                                "ram:GetResourceShareAssociations",
+                                "elasticfilesystem:DeleteAccessPoint",
+                                "elasticfilesystem:UntagResource",
+                                "elasticfilesystem:CreateFileSystem",
+                                "backup:StartRestoreJob",
+                                "elasticfilesystem:PutLifecycleConfiguration",
+                                "elasticfilesystem:DeleteMountTarget",
+                                "elasticfilesystem:CreateAccessPoint",
+                                "elasticfilesystem:PutFileSystemPolicy",
+                                "elasticfilesystem:Restore",
+                                "backup:DeleteBackupVault",
+                                "backup:DescribeRestoreJob",
+                                "backup:CreateBackupVault",
+                                "backup-storage:MountCapsule",
+                                "elasticfilesystem:TagResource",
+                                "elasticfilesystem:CreateMountTarget",
+                                "elasticfilesystem:PutBackupPolicy",
+                                "elasticfilesystem:DeleteFileSystem",
+                                "elasticfilesystem:UpdateFileSystem",
+                                "s3:ListBucketVersions",
+                                "s3:GetBucketVersioning",
+                                "s3:GetBucketObjectLockConfiguration",
+                                "s3:GetObjectRetention",
+                                "s3:DeleteObjectVersion",
+                                "s3:PutObjectRetention",
+                                "s3:GetObjectVersion",
+                                "s3:GetObject",
+                                "s3:DeleteObject",
+                                "s3:RestoreObject",
+                                "kms:Encrypt",
+                                "kms:Decrypt"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+        "VeeamInstanceBackupRestoreAccessPolicy02": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "rds:DescribeDBClusterParameterGroups",
+                                "ec2:AuthorizeSecurityGroupIngress",
+                                "ec2:CreateVpc",
+                                "ec2:AttachInternetGateway",
+                                "ec2:CreateInternetGateway",
+                                "ec2:RevokeSecurityGroupEgress",
+                                "ec2:ModifyVpcAttribute",
+                                "ec2:DeleteInternetGateway",
+                                "ec2:DeleteNetworkAcl",
+                                "ec2:AuthorizeSecurityGroupEgress",
+                                "ec2:DetachInternetGateway",
+                                "ec2:RevokeSecurityGroupIngress",
+                                "ec2:DeleteVpc",
+                                "ec2:CreateNetworkAclEntry",
+                                "ec2:DeleteNetworkAclEntry",
+                                "ec2:ModifyManagedPrefixList",
+                                "ec2:ModifyVpcEndpointServiceConfiguration",
+                                "elasticloadbalancing:ModifyTargetGroup",
+                                "lambda:ListFunctions",
+                                "ec2:ModifyVpcEndpoint",
+                                "ec2:ModifyVpcPeeringConnectionOptions",
+                                "ec2:ModifyTransitGatewayVpcAttachment",
+                                "ec2:ModifyTransitGateway",
+                                "ram:UntagResource",
+                                "ram:TagResource",
+                                "ram:DisassociateResourceShare",
+                                "ec2:AssociateVpcCidrBlock",
+                                "ec2:AssociateDhcpOptions",
+                                "ram:AssociateResourceShare",
+                                "ec2:GetTransitGatewayMulticastDomainAssociations",
+                                "ec2:AssociateTransitGatewayRouteTable",
+                                "ec2:AttachVpnGateway",
+                                "ec2:CreateCustomerGateway",
+                                "ec2:CreateEgressOnlyInternetGateway",
+                                "ec2:CreateManagedPrefixList",
+                                "ec2:CreateRouteTable",
+                                "ec2:CreateSubnet",
+                                "ec2:CreateTransitGateway",
+                                "ec2:CreateTransitGatewayMulticastDomain",
+                                "ec2:CreateTransitGatewayRouteTable",
+                                "ec2:CreateTransitGatewayVpcAttachment",
+                                "ec2:CreateVpcEndpoint",
+                                "ec2:CreateVpcPeeringConnection",
+                                "ec2:CreateVpnConnection",
+                                "ec2:CreateVpnGateway",
+                                "ec2:AcceptVpcEndpointConnections",
+                                "ec2:RejectVpcEndpointConnections",
+                                "ec2:CreateTransitGatewayRoute",
+                                "ec2:EnableTransitGatewayRouteTablePropagation",
+                                "ec2:DisableTransitGatewayRouteTablePropagation",
+                                "ec2:DeleteTransitGatewayRoute",
+                                "ec2:DeleteTransitGatewayRouteTable",
+                                "ec2:AssociateClientVpnTargetNetwork",
+                                "ec2:AssociateRouteTable",
+                                "ec2:AssociateSubnetCidrBlock",
+                                "ec2:AssociateTransitGatewayMulticastDomain",
+                                "ec2:AuthorizeClientVpnIngress",
+                                "ec2:CreateClientVpnEndpoint",
+                                "ec2:CreateClientVpnRoute",
+                                "ec2:CreateNetworkAcl",
+                                "ec2:CreateRoute",
+                                "ec2:CreateTransitGatewayPeeringAttachment",
+                                "ec2:CreateVpcEndpointServiceConfiguration",
+                                "ec2:DeleteClientVpnEndpoint",
+                                "ec2:DeleteClientVpnRoute",
+                                "ec2:DeleteCustomerGateway",
+                                "ec2:DeleteNatGateway",
+                                "ec2:DeleteRoute",
+                                "ec2:DeleteRouteTable",
+                                "ec2:DeleteSubnet",
+                                "ec2:DeleteTransitGateway",
+                                "ec2:DeleteTransitGatewayMulticastDomain",
+                                "ec2:DeleteTransitGatewayPeeringAttachment",
+                                "ec2:DeleteTransitGatewayVpcAttachment",
+                                "ec2:DeleteVpcEndpointServiceConfigurations",
+                                "ec2:DeleteVpcPeeringConnection",
+                                "ec2:DeleteVpnConnection",
+                                "ec2:DeleteVpnGateway",
+                                "ec2:DetachVpnGateway",
+                                "ec2:DisableVgwRoutePropagation",
+                                "ec2:DisassociateClientVpnTargetNetwork",
+                                "ec2:DisassociateRouteTable",
+                                "ec2:DisassociateTransitGatewayMulticastDomain",
+                                "ec2:DisassociateTransitGatewayRouteTable",
+                                "ec2:EnableVgwRoutePropagation",
+                                "ec2:ModifyClientVpnEndpoint",
+                                "ec2:ModifySubnetAttribute",
+                                "ec2:ModifyVpnConnection",
+                                "ec2:ReleaseAddress",
+                                "ec2:ReplaceNetworkAclAssociation",
+                                "ec2:ReplaceRouteTableAssociation",
+                                "ec2:RevokeClientVpnIngress",
+                                "elasticloadbalancing:DeleteLoadBalancer",
+                                "elasticloadbalancing:DeleteTargetGroup",
+                                "elasticloadbalancing:CreateTargetGroup",
+                                "elasticloadbalancing:RegisterTargets",
+                                "elasticloadbalancing:DeregisterTargets",
+                                "elasticloadbalancing:CreateListener",
+                                "elasticloadbalancing:DeleteListener",
+                                "elasticloadbalancing:CreateLoadBalancer"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+        "VeeamInstanceBackupRestoreAccessPolicy03": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "iam:ListAccountAliases",
+                                "iam:GetContextKeysForPrincipalPolicy",
+                                "iam:SimulatePrincipalPolicy",
+                                "sqs:DeleteMessage",
+                                "ec2:AttachVolume",
+                                "iam:CreateInstanceProfile",
+                                "ssm:SendCommand",
+                                "ec2:DeleteSnapshot",
+                                "ec2:CreateKeyPair",
+                                "ec2:DescribeInstanceAttribute",
+                                "sqs:ReceiveMessage",
+                                "iam:RemoveRoleFromInstanceProfile",
+                                "iam:CreateRole",
+                                "iam:AttachRolePolicy",
+                                "iam:PutRolePolicy",
+                                "iam:AddRoleToInstanceProfile",
+                                "ec2:DeleteVolume",
+                                "iam:ListInstanceProfilesForRole",
+                                "iam:PassRole",
+                                "iam:DetachRolePolicy",
+                                "ec2:ModifySnapshotAttribute",
+                                "iam:ListAttachedRolePolicies",
+                                "iam:DeleteRolePolicy",
+                                "ec2:DescribeVolumes",
+                                "ec2:CreateSnapshot",
+                                "ec2:ModifyInstanceAttribute",
+                                "ec2:DescribeKeyPairs",
+                                "iam:ListRolePolicies",
+                                "servicequotas:ListServiceQuotas",
+                                "ec2:DetachVolume",
+                                "iam:DeleteInstanceProfile",
+                                "sqs:ListQueues",
+                                "ec2:TerminateInstances",
+                                "iam:GetInstanceProfile",
+                                "ec2:CreateTags",
+                                "sqs:SendMessage",
+                                "ec2:RunInstances",
+                                "iam:DeleteRole",
+                                "ec2:CreateVolume",
+                                "ssm:GetCommandInvocation",
+                                "ec2:DescribeImages",
+                                "sqs:DeleteQueue",
+                                "sqs:CreateQueue",
+                                "ec2:DeleteKeyPair",
+                                "ec2:DescribeAccountAttributes",
+                                "ec2:DescribeSecurityGroups",
+                                "ec2:DescribeSubnets",
+                                "ec2:DescribeInstances",
+                                "ec2:DescribeSnapshots",
+                                "ec2:StopInstances",
+                                "ec2:StartInstances",
+                                "iam:GetRole",
+                                "ec2:CopySnapshot",
+                                "ssm:GetParameter",
+                                "ec2:ModifyVolume",
+                                "ebs:ListSnapshotBlocks",
+                                "ebs:ListChangedBlocks",
+                                "ec2:DescribeVpcs",
+                                "ec2:DescribeRegions",
+                                "ec2:DescribeVpcEndpoints",
+                                "ec2:DescribeRouteTables",
+                                "ec2:DescribeAvailabilityZones",
+                                "kinesis:DeleteStream",
+                                "kinesis:CreateStream",
+                                "kinesis:DescribeStream",
+                                "kinesis:PutRecord",
+                                "kms:ListKeys",
+                                "kms:ListAliases",
+                                "kms:GetKeyPolicy",
+                                "kms:ReEncryptTo",
+                                "kms:DescribeKey",
+                                "kms:ReEncryptFrom",
+                                "ec2:GetEbsDefaultKmsKeyId",
+                                "kms:CreateGrant",
+                                "kms:GenerateDataKeyWithoutPlaintext",
+                                "events:DescribeRule",
+                                "sns:ListSubscriptionsByTopic",
+                                "sns:DeleteTopic",
+                                "events:PutRule",
+                                "sns:CreateTopic",
+                                "sns:ListTopics",
+                                "sns:Unsubscribe",
+                                "sns:SetTopicAttributes",
+                                "events:PutTargets",
+                                "events:DeleteRule",
+                                "sns:Subscribe",
+                                "events:RemoveTargets",
+                                "events:ListTargetsByRule",
+                                "sqs:SetQueueAttributes",
+                                "ec2:DescribeSnapshotAttribute",
+                                "ec2:DeleteTags",
+                                "ec2:CreateSnapshots",
+                                "ec2:DescribeConversionTasks",
+                                "ec2:DescribeVolumeAttribute",
+                                "ec2:DescribeTags",
+                                "ec2:DescribeInstanceTypes",
+                                "ec2:DescribeAddresses",
+                                "ec2:DescribeNetworkInterfaces",
+                                "ssm:DescribeInstanceInformation",
+                                "iam:ListInstanceProfiles"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+        "VeeamInstanceBackupRestoreAccessPolicy04": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "rds:AddTagsToResource",
+                                "rds:ListTagsForResource",
+                                "rds:DescribeDBSnapshots",
+                                "rds:CreateDBSnapshot",
+                                "rds:DescribeDBInstances",
+                                "rds:DeleteDBSnapshot",
+                                "rds:ModifyDBSnapshotAttribute",
+                                "rds:RemoveTagsFromResource",
+                                "rds:CopyDBSnapshot",
+                                "rds:DescribeDBClusters",
+                                "rds:CreateDBClusterSnapshot",
+                                "rds:DescribeDBClusterSnapshots",
+                                "rds:DeleteDbclusterSnapshot",
+                                "rds:CopyDbClusterSnapshot",
+                                "rds:ModifyDBClusterSnapshotAttribute",
+                                "rds:DescribeDBSubnetGroups",
+                                "ec2:DescribeDhcpOptions",
+                                "ec2:DescribeVpcAttribute",
+                                "ec2:DescribeInternetGateways",
+                                "elasticloadbalancing:DescribeLoadBalancers",
+                                "ram:GetResourceShares",
+                                "ec2:DescribeManagedPrefixLists",
+                                "ec2:DescribeNetworkAcls",
+                                "ec2:DescribeClientVpnEndpoints",
+                                "ec2:DescribeEgressOnlyInternetGateways",
+                                "ec2:GetManagedPrefixListEntries",
+                                "ec2:DescribeVpnConnections",
+                                "ec2:DescribeVpcPeeringConnections",
+                                "ec2:DescribeNatGateways",
+                                "ec2:DescribeVpcEndpointServiceConfigurations",
+                                "ec2:DescribeCustomerGateways",
+                                "ram:ListResources",
+                                "ram:ListPrincipals",
+                                "elasticloadbalancing:DescribeTargetGroups",
+                                "ec2:DescribeVpnGateways",
+                                "ec2:DescribeTransitGatewayAttachments",
+                                "ec2:DescribeTransitGatewayMulticastDomains",
+                                "ec2:DescribeTransitGatewayPeeringAttachments",
+                                "ec2:DescribeTransitGatewayRouteTables",
+                                "ec2:DescribeTransitGateways",
+                                "ec2:DescribeTransitGatewayVpcAttachments",
+                                "ec2:GetTransitGatewayRouteTableAssociations",
+                                "elasticloadbalancing:DescribeListeners",
+                                "elasticloadbalancing:DescribeTags",
+                                "elasticloadbalancing:DescribeTargetHealth",
+                                "ram:ListResourceSharePermissions",
+                                "ec2:SearchTransitGatewayRoutes",
+                                "ec2:GetTransitGatewayRouteTablePropagations",
+                                "ec2:DescribeClientVpnAuthorizationRules",
+                                "ec2:DescribeClientVpnRoutes",
+                                "ec2:DescribeClientVpnTargetNetworks",
+                                "ec2:GetTransitGatewayPrefixListReferences",
+                                "backup:StopBackupJob",
+                                "backup:TagResource",
+                                "backup:ListTags",
+                                "backup:StartBackupJob",
+                                "backup:DescribeCopyJob",
+                                "backup:DescribeBackupJob",
+                                "backup:DeleteRecoveryPoint",
+                                "backup:CopyIntoBackupVault",
+                                "backup:ListBackupVaults",
+                                "backup:ListRecoveryPointsByBackupVault",
+                                "backup:StartCopyJob",
+                                "backup:CopyFromBackupVault",
+                                "elasticfilesystem:DescribeMountTargets",
+                                "elasticfilesystem:ListTagsForResource",
+                                "elasticfilesystem:DescribeAccessPoints",
+                                "elasticfilesystem:DescribeTags",
+                                "elasticfilesystem:Backup",
+                                "elasticfilesystem:DescribeFileSystems",
+                                "elasticfilesystem:DescribeMountTargetSecurityGroups",
+                                "elasticfilesystem:DescribeFileSystemPolicy",
+                                "elasticfilesystem:DescribeLifecycleConfiguration",
+                                "elasticfilesystem:DescribeBackupPolicy",
+                                "backup:UntagResource",
+                                "backup:DescribeRecoveryPoint",
+                                "ec2:DescribeNetworkInterfaceAttribute",
+                                "ec2:DescribeInstanceStatus",
+                                "ec2:CreateNetworkInterface",
+                                "ec2:DisassociateAddress",
+                                "ec2:DeleteNetworkInterface",
+                                "ec2:AttachNetworkInterface",
+                                "ec2:AssignPrivateIpAddresses",
+                                "ec2:AssociateAddress",
+                                "ec2:AllocateAddress",
+                                "ec2:ModifyNetworkInterfaceAttribute",
+                                "rds:DescribeDBEngineVersions",
+                                "rds:DescribeDBParameterGroups",
+                                "rds:RestoreDBInstanceFromDBSnapshot",
+                                "rds:DescribeOrderableDBInstanceOptions",
+                                "rds:ModifyDBInstance",
+                                "rds:DescribeOptionGroups",
+                                "rds:DeleteDBInstance",
+                                "rds:DescribeAccountAttributes",
+                                "iam:CreateServiceLinkedRole",
+                                "rds:RestoreDBClusterFromSnapshot",
+                                "rds:CreateDBInstance",
+                                "rds:DeleteDBCluster",
+                                "rds:ModifyDBCluster",
+                                "rds:DescribeDBClusterParameters"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+        "VcbSnapshotsRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "dlm.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "vcb-describe-snap",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DescribeVolumes",
+                                        "ec2:DescribeInstances",
+                                        "ec2:DescribeSnapshots"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": "vcb-modify-snap",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DeleteSnapshot",
+                                        "ec2:CreateTags"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": [
+                                            "arn:${Param1}:ec2:${AWS::Region}::snapshot/*",
+                                            {
+                                                "Param1": {
+                                                    "Fn::If": [
+                                                        "IsGovCloud",
+                                                        "aws-us-gov",
+                                                        "aws"
+                                                    ]
+                                                }
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Action": [
+                                        "ec2:CreateSnapshot",
+                                        "ec2:CreateSnapshots"
+                                    ],
+                                    "Resource": "*",
+                                    "Effect": "Allow"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "VeeamInstanceBackupRestoreAccessRoleV1": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Sub": [
+                                        "arn:${Param1}:sts::${AWS::AccountId}:role/${Param2}",
+                                        {
+                                            "Param1": {
+                                                "Fn::If": [
+                                                    "IsGovCloud",
+                                                    "aws-us-gov",
+                                                    "aws"
+                                                ]
+                                            },
+                                            "Param2": {
+                                                "Fn::Sub": "${VeeamImpersonationRoleV1}"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "Service": [
+                                    "backup.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    {
+                        "Ref": "VeeamInstanceBackupRestoreAccessPolicy01"
+                    },
+                    {
+                        "Ref": "VeeamInstanceBackupRestoreAccessPolicy02"
+                    },
+                    {
+                        "Ref": "VeeamInstanceBackupRestoreAccessPolicy03"
+                    },
+                    {
+                        "Ref": "VeeamInstanceBackupRestoreAccessPolicy04"
+                    }
+                ]
+            }
+        },
+        "VeeamImpersonationRoleV1": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "vcb-assume",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "sts:AssumeRole"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "VcbInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "VeeamImpersonationRoleV1"
+                    }
+                ]
+            }
+        },
+        "VcbEc2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "VMInstanceType"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "VcbInstanceProfile"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "VcbSecurityGroup"
+                    }
+                ],
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "RegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "HVM64"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "VcbSubnet"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ],
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeSize": "16"
+                        }
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "${VeeamImpersonationRoleV1.Arn}\n${VeeamInstanceBackupRestoreAccessRoleV1.Arn}"
+                    }
+                }
+            }
+        },
+        "VcbEIP": {
+            "Type": "AWS::EC2::EIP",
+            "Condition": "CreateEIPCond",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "VcbEIPAssociation": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Condition": "CreateEIPCond",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "VcbEIP",
+                        "AllocationId"
+                    ]
+                },
+                "InstanceId": {
+                    "Ref": "VcbEc2Instance"
+                }
+            }
+        },
+        "VcbSubnet": {
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "SubnetCidr"
+                },
+                "MapPublicIpOnLaunch": "true",
+                "VpcId": {
+                    "Ref": "VcbVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName} Subnet"
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "VcbVPC": {
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VpcCidr"
+                },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName} VPC"
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::VPC"
+        },
+        "VcbInternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName} InternetGateway"
+                        }
+                    }
+                ]
+            }
+        },
+        "VcbGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VcbVPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "VcbInternetGateway"
+                }
+            }
+        },
+        "VcbRouteTable": {
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VcbVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName} RouteTable"
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "VcbRouteToGateway": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "VcbGatewayAttachment",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "RouteTableId": {
+                    "Ref": "VcbRouteTable"
+                },
+                "GatewayId": {
+                    "Ref": "VcbInternetGateway"
+                }
+            }
+        },
+        "VcbRouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "VcbRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "VcbSubnet"
+                }
+            }
+        },
+        "VcbSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable HTTPS access via ports 443",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "CidrIp": {
+                            "Ref": "HTTPLocation"
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VcbVPC"
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "InstanceId of the newly created Vcb EC2 instance",
+            "Value": {
+                "Ref": "VcbEc2Instance"
+            }
+        }
+    }
+}

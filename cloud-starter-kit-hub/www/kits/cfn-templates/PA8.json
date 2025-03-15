@@ -1,0 +1,131 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Deploy a Palo Alto firewall with BYOL and DNS hostnames enabled",
+    "Parameters": {
+        "KeyName": {
+            "Description": "Name of the existing key pair to use for SSH access",
+            "Type": "String"
+        },
+        "VpcId": {
+            "Description": "ID of the existing VPC",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "Subnet1Id": {
+            "Description": "ID of the existing subnet 1",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "Subnet2Id": {
+            "Description": "ID of the existing subnet 2",
+            "Type": "AWS::EC2::Subnet::Id"
+        }
+    },
+    "Resources": {
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "SecurityGroupFW": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Palo Alto Security Group",
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "0",
+                        "ToPort": "65535",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "Firewall": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": "ami-0a98fadef8512ef26",
+                "NetworkInterfaces": [
+                    {
+                        "Description": "Primary network interface",
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "Subnet1Id"
+                        },
+                        "AssociatePublicIpAddress": true,
+                        "GroupSet": [
+                            {
+                                "Ref": "SecurityGroupFW"
+                            }
+                        ]
+                    }
+                ],
+                "InstanceType": "m5.2xlarge",
+                "KeyName": {
+                    "Ref": "KeyName"
+                }
+            }
+        },
+        "RouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "RouteTable2": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "Route": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                },
+                "RouteTableId": {
+                    "Ref": "RouteTable1"
+                }
+            }
+        },
+        "Subnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable2"
+                },
+                "SubnetId": {
+                    "Ref": "Subnet1Id"
+                }
+            }
+        },
+        "Subnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable2"
+                },
+                "SubnetId": {
+                    "Ref": "Subnet2Id"
+                }
+            }
+        }
+    }
+}
