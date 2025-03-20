@@ -5,7 +5,7 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 # Run UglifyJS on preload.js
-& "./node_modules/.bin/uglifyjs" "src/scripts/preload.js" -o "src/scripts/preload.min.js" -c
+& "./node_modules/.bin/uglifyjs" "src/scripts/preload.js" -o "test/preload.min.js" -c
 
 # Add copyright notice to preload.min.js
 $copyright = @"
