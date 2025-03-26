@@ -1,0 +1,274 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Template for EC2 instance creation with RHEL 8/9 AMI selection or custom AMI",
+    "Parameters": {
+        "AMISelectionMethod": {
+            "Type": "String",
+            "Default": "RHEL_Public",
+            "AllowedValues": ["RHEL_Public", "Custom"],
+            "Description": "Select whether to use RHEL public AMIs or provide custom AMI ID"
+        },
+        "RHELVersion": {
+            "Type": "String",
+            "Default": "RHEL9",
+            "AllowedValues": ["RHEL8", "RHEL9"],
+            "Description": "Select RHEL Version (only applicable if using RHEL public AMIs)"
+        },
+        "CustomAMIId": {
+            "Type": "String",
+            "Default": "",
+            "Description": "Enter custom AMI ID (only required if AMISelectionMethod is Custom). The latest RHEL Image Id (BYOS or PAYG) - Please input the latest Ami Id of RHEL image you want in that region. You can get the latest ami id from https://access.redhat.com/solutions/15356  Please follow the instructions at this site and get the image id from region you want and input in textbox here."
+        },
+        "InstanceType": {
+            "Type": "String",
+            "Default": "t3.micro",
+            "AllowedValues": ["t3.micro", "t3.small", "t3.medium"],
+            "Description": "EC2 instance type"
+        },
+        "KeyName": {
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Description": "Name of an existing EC2 KeyPair"
+        },
+        "VpcId": {
+            "Type": "AWS::EC2::VPC::Id",
+            "Description": "VPC ID where the EC2 instance will be created"
+        },
+        "SubnetId": {
+            "Type": "AWS::EC2::Subnet::Id",
+            "Description": "Subnet ID where EC2 instance will be launched"
+        }
+    },
+    "Conditions": {
+        "UseCustomAMI": {
+            "Fn::Equals": [
+                { "Ref": "AMISelectionMethod" },
+                "Custom"
+            ]
+        },
+        "UseRHEL9": {
+            "Fn::And": [
+                { "Fn::Equals": [{ "Ref": "AMISelectionMethod" }, "RHEL_Public"] },
+                { "Fn::Equals": [{ "Ref": "RHELVersion" }, "RHEL9"] }
+            ]
+        },
+        "UseRHEL8": {
+            "Fn::And": [
+                { "Fn::Equals": [{ "Ref": "AMISelectionMethod" }, "RHEL_Public"] },
+                { "Fn::Equals": [{ "Ref": "RHELVersion" }, "RHEL8"] }
+            ]
+        }
+    },
+    "Resources": {
+        "AMILookupFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.handler",
+                "Role": { "Fn::GetAtt": ["LambdaExecutionRole", "Arn"] },
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "import boto3",
+                                "import cfnresponse",
+                                "",
+                                "def handler(event, context):",
+                                "    if event['RequestType'] in ['Create', 'Update']:",
+                                "        try:",
+                                "            ec2 = boto3.client('ec2')",
+                                "            rhel_version = event['ResourceProperties'].get('RHELVersion', 'RHEL9')",
+                                "            version_number = '9' if rhel_version == 'RHEL9' else '8'",
+                                "",
+                                "            # Get RHEL AMIs",
+                                "            response = ec2.describe_images(",
+                                "                Owners=['309956199498'],",
+                                "                Filters=[",
+                                "                    {'Name': 'name', 'Values': [f'RHEL-{version_number}*']},",
+                                "                    {'Name': 'architecture', 'Values': ['x86_64']},",
+                                "                    {'Name': 'root-device-type', 'Values': ['ebs']},",
+                                "                    {'Name': 'virtualization-type', 'Values': ['hvm']},",
+                                "                    {'Name': 'state', 'Values': ['available']}",
+                                "                ]",
+                                "            )",
+                                "",
+                                "            # Sort AMIs by creation date",
+                                "            amis = sorted(",
+                                "                response['Images'],",
+                                "                key=lambda x: x['CreationDate'],",
+                                "                reverse=True",
+                                "            )",
+                                "",
+                                "            if amis:",
+                                "                latest_ami = amis[0]['ImageId']",
+                                "                cfnresponse.send(event, context, cfnresponse.SUCCESS, {",
+                                "                    'Id': latest_ami",
+                                "                })",
+                                "            else:",
+                                "                cfnresponse.send(event, context, cfnresponse.FAILED, {",
+                                "                    'Error': f'No {rhel_version} AMIs found'",
+                                "                })",
+                                "        except Exception as e:",
+                                "            print(f'Error: {str(e)}')",
+                                "            cfnresponse.send(event, context, cfnresponse.FAILED, {",
+                                "                'Error': str(e)",
+                                "            })",
+                                "    else:",
+                                "        cfnresponse.send(event, context, cfnresponse.SUCCESS, {",
+                                "            'Id': ''",
+                                "        })",
+                                ""
+                            ]
+                        ]
+                    }
+                },
+                "Runtime": "python3.9",
+                "Timeout": 300
+            }
+        },
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": ["lambda.amazonaws.com"]
+                        },
+                        "Action": ["sts:AssumeRole"]
+                    }]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "Policies": [{
+                    "PolicyName": "AMILookupPolicy",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "ec2:DescribeImages"
+                                ],
+                                "Resource": "*"
+                            }
+                        ]
+                    }
+                }]
+            }
+        },
+        "RHEL8AMILookup": {
+            "Type": "Custom::AMILookup",
+            "Condition": "UseRHEL8",
+            "Properties": {
+                "ServiceToken": { "Fn::GetAtt": ["AMILookupFunction", "Arn"] },
+                "RHELVersion": "RHEL8"
+            }
+        },
+        "RHEL9AMILookup": {
+            "Type": "Custom::AMILookup",
+            "Condition": "UseRHEL9",
+            "Properties": {
+                "ServiceToken": { "Fn::GetAtt": ["AMILookupFunction", "Arn"] },
+                "RHELVersion": "RHEL9"
+            }
+        },
+        "EC2SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for EC2 instance",
+                "VpcId": { "Ref": "VpcId" },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "SSH access"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::If": [
+                                "UseCustomAMI",
+                                "Custom-AMI-SG",
+                                { "Fn::Sub": "${RHELVersion}-SG" }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "EC2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": {
+                    "Fn::If": [
+                        "UseCustomAMI",
+                        { "Ref": "CustomAMIId" },
+                        {
+                            "Fn::If": [
+                                "UseRHEL9",
+                                { "Fn::GetAtt": ["RHEL9AMILookup", "Id"] },
+                                { "Fn::GetAtt": ["RHEL8AMILookup", "Id"] }
+                            ]
+                        }
+                    ]
+                },
+                "InstanceType": { "Ref": "InstanceType" },
+                "KeyName": { "Ref": "KeyName" },
+                "SubnetId": { "Ref": "SubnetId" },
+                "SecurityGroupIds": [{ "Ref": "EC2SecurityGroup" }],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::If": [
+                                "UseCustomAMI",
+                                "Custom-AMI-Instance",
+                                { "Fn::Sub": "${RHELVersion}-Instance" }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "EC2 Instance ID",
+            "Value": { "Ref": "EC2Instance" }
+        },
+        "PublicIP": {
+            "Description": "Public IP address of the EC2 instance",
+            "Value": { "Fn::GetAtt": ["EC2Instance", "PublicIp"] }
+        },
+        "PrivateIP": {
+            "Description": "Private IP address of the EC2 instance",
+            "Value": { "Fn::GetAtt": ["EC2Instance", "PrivateIp"] }
+        },
+        "SecurityGroupId": {
+            "Description": "Security Group ID",
+            "Value": { "Ref": "EC2SecurityGroup" }
+        },
+        "AMIId": {
+            "Description": "AMI ID used for the instance",
+            "Value": {
+                "Fn::If": [
+                    "UseCustomAMI",
+                    { "Ref": "CustomAMIId" },
+                    {
+                        "Fn::If": [
+                            "UseRHEL9",
+                            { "Fn::GetAtt": ["RHEL9AMILookup", "Id"] },
+                            { "Fn::GetAtt": ["RHEL8AMILookup", "Id"] }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+}

@@ -95,6 +95,14 @@
 		   "Category": "Virtual Machines",
             "Kits": [
                 {
+                    "Name": "RedHat 8,9 and Custom Bundle - RHEL Virtual Machine bundle",
+                    "Description": "This kit deploys RedHat related AMIs version 8 or 9 by getting the latest amis sorted by latest creation date or you can input custom AMI Id from Redhat here. <br> The latest RHEL Image Id (BYOS or PAYG) - Please choose the latest Ami Id of RHEL image you want in that region. You can get the latest ami id from https://access.redhat.com/solutions/15356 Please follow the instructions at this site and get the image id from the region you want.",
+                    "Templates": [
+                        "EC2-RHEL8,9-CustomAMI.json"
+                    ],
+                    "VpcRequired": false
+                },
+                {
                     "Name": "Ubuntu Virtual Machine Bundle",
                     "Description": "This kit deploys 1 x Virtual Machine (Ubuntu)<br>You can choose from 3 sizes:<br>Small: 2vCPU’s, 4GB RAM, 50GB <br>Medium: 2vCPU’s, 8GB RAM, 50GB <br>Large: 2vCPU’s, 16GB RAM, 50GB <br> 1. Pre-configured host based firewall to allow RDP <br>2. Deployable in existing networks in AWS or new networks (Network Bundle)",
                     "Templates": [
