@@ -270,6 +270,22 @@
                     "MoreInfo": ""
                 }
 		            ]
+	    },
+        {
+            "TopLevelCategory": "Advanced Solutions",
+            "Category": "Migration",
+            "Kits": [
+                {
+                    "Name": "RedHat Openshift Service on AWS (ROSA)- Classic",
+                    "Description": "Complete ROSA Classic Infrastructure with VPC and Cluster - Multi-AZ with Master, Infrastructure, and Worker nodes. Please make sure you complete all the pre-requisites before running this template.",
+                    "Templates": [
+                        "ROSA-Classic.json"
+                    ],
+                    "VpcRequired": false,
+                    "Copyright": "",
+                    "MoreInfo": ""
+                }
+		            ]
 	    }        
     ]
 }

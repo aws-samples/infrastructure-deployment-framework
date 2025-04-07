@@ -1,0 +1,1969 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Complete ROSA Classic Infrastructure with VPC and Cluster - Multi-AZ with Master, Infrastructure, and Worker nodes. Please make sure you complete all the pre-requisites before running this template.",
+    "Parameters": {
+        "VpcCidr": {
+            "Type": "String",
+            "Default": "10.0.0.0/16",
+            "Description": "CIDR block for VPC"
+        },
+        "PublicSubnet1Cidr": {
+            "Type": "String",
+            "Default": "10.0.0.0/24",
+            "Description": "CIDR block for Public Subnet 1"
+        },
+        "PublicSubnet2Cidr": {
+            "Type": "String",
+            "Default": "10.0.1.0/24",
+            "Description": "CIDR block for Public Subnet 2"
+        },
+        "PublicSubnet3Cidr": {
+            "Type": "String",
+            "Default": "10.0.2.0/24",
+            "Description": "CIDR block for Public Subnet 3"
+        },
+        "PrivateSubnet1Cidr": {
+            "Type": "String",
+            "Default": "10.0.3.0/24",
+            "Description": "CIDR block for Private Subnet 1"
+        },
+        "PrivateSubnet2Cidr": {
+            "Type": "String",
+            "Default": "10.0.4.0/24",
+            "Description": "CIDR block for Private Subnet 2"
+        },
+        "PrivateSubnet3Cidr": {
+            "Type": "String",
+            "Default": "10.0.5.0/24",
+            "Description": "CIDR block for Private Subnet 3"
+        },
+        "ClusterName": {
+            "Type": "String",
+            "Description": "Name of the ROSA cluster"
+        },
+        "Version": {
+            "Type": "String",
+            "Default": "4.18.5",
+            "Description": "OpenShift version for the cluster"
+        },
+        "MasterInstanceType": {
+            "Type": "String",
+            "Default": "m5.2xlarge",
+            "Description": "EC2 instance type for master nodes"
+        },
+        "InfrastructureInstanceType": {
+            "Type": "String",
+            "Default": "r5.xlarge",
+            "Description": "EC2 instance type for infrastructure nodes"
+        },
+        "WorkerInstanceType": {
+            "Type": "String",
+            "Default": "m5.xlarge",
+            "Description": "EC2 instance type for worker nodes"
+        },
+        "WorkerNodeCount": {
+            "Type": "Number",
+            "Default": 3,
+            "MinValue": 3,
+            "Description": "Number of worker nodes (minimum 3 for multi-AZ)"
+        },
+        "MultiAZ": {
+            "Type": "String",
+            "Default": "true",
+            "AllowedValues": [
+                "true",
+                "false"
+            ],
+            "Description": "Deploy cluster across multiple AZs"
+        },
+        "ACMCertificateArn": {
+            "Type": "String",
+            "Description": "ARN of ACM Certificate for ALB HTTPS listeners"
+        },
+        "HealthCheckPath": {
+            "Type": "String",
+            "Default": "/healthz",
+            "Description": "Health check path for load balancer targets"
+        },
+        "SREAccessCIDR": {
+            "Type": "String",
+            "Description": "CIDR block for SRE SSH access (e.g., corporate VPN range)",
+            "Default": "0.0.0.0/0"
+        },
+        "BastionInstanceType": {
+            "Type": "String",
+            "Default": "t3.micro",
+            "Description": "EC2 instance type for bastion host"
+        },
+        "SSHKeyName": {
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Description": "Name of an existing EC2 KeyPair for SSH access"
+        },
+        "ROSAToken": {
+            "Type": "String",
+            "NoEcho": true,
+            "Description": "ROSA CLI token for authentication"
+        }
+    },
+    "Resources": {
+        "BastionSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for Bastion Host",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "CidrIp": {
+                            "Ref": "SREAccessCIDR"
+                        }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Bastion-SG"
+                    }
+                ]
+            }
+        },
+        "ROSAInstallerNodeSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for ROSA installer",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${ClusterName}-rosa-installer-sg"
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSANodeSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for ROSA nodes",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "SourceSecurityGroupId": {
+                            "Ref": "BastionSecurityGroup"
+                        }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Nodes-SG"
+                    }
+                ]
+            }
+        },
+        "BastionHostRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "BastionHostPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DescribeInstances",
+                                        "ec2:DescribeTags"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "BastionHostInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "BastionHostRole"
+                    }
+                ]
+            }
+        },
+        "BastionHost": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "BastionInstanceType"
+                },
+                "ImageId": {
+                    "Fn::Sub": "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"
+                },
+                "KeyName": {
+                    "Ref": "SSHKeyName"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "BastionSecurityGroup"
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "BastionHostInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "yum update -y\n",
+                                "yum install -y aws-cli jq\n",
+                                "amazon-linux-extras install -y ansible2\n",
+                                "# Install SSM agent\n",
+                                "yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm\n",
+                                "systemctl enable amazon-ssm-agent\n",
+                                "systemctl start amazon-ssm-agent\n",
+                                "# Configure SSH hardening\n",
+                                "sed -i 's/#MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\n",
+                                "sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config\n",
+                                "sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config\n",
+                                "systemctl restart sshd\n"
+                            ]
+                        ]
+                    }
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Bastion"
+                    }
+                ]
+            }
+        },
+        "BastionEIP": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc",
+                "InstanceId": {
+                    "Ref": "BastionHost"
+                }
+            }
+        },
+        "ROSAExternalALBSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for ROSA external load balancer",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-External-ALB-SG"
+                    }
+                ]
+            }
+        },
+        "ROSAInternalALBSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for ROSA internal load balancer",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": {
+                            "Ref": "VpcCidr"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": {
+                            "Ref": "VpcCidr"
+                        }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Internal-ALB-SG"
+                    }
+                ]
+            }
+        },
+        "ROSAExternalALB": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "ClusterName"
+                            },
+                            "external-alb"
+                        ]
+                    ]
+                },
+                "Scheme": "internet-facing",
+                "LoadBalancerAttributes": [
+                    {
+                        "Key": "idle_timeout.timeout_seconds",
+                        "Value": "60"
+                    },
+                    {
+                        "Key": "deletion_protection.enabled",
+                        "Value": "false"
+                    }
+                ],
+                "SecurityGroups": [
+                    {
+                        "Ref": "ROSAExternalALBSecurityGroup"
+                    }
+                ],
+                "Subnets": [
+                    {
+                        "Ref": "PublicSubnet1"
+                    },
+                    {
+                        "Ref": "PublicSubnet2"
+                    },
+                    {
+                        "Ref": "PublicSubnet3"
+                    }
+                ],
+                "Type": "application",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ClusterName"
+                                    },
+                                    "external-alb"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAInternalALB": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "ClusterName"
+                            },
+                            "internal-alb"
+                        ]
+                    ]
+                },
+                "Scheme": "internal",
+                "LoadBalancerAttributes": [
+                    {
+                        "Key": "idle_timeout.timeout_seconds",
+                        "Value": "60"
+                    },
+                    {
+                        "Key": "deletion_protection.enabled",
+                        "Value": "false"
+                    }
+                ],
+                "SecurityGroups": [
+                    {
+                        "Ref": "ROSAInternalALBSecurityGroup"
+                    }
+                ],
+                "Subnets": [
+                    {
+                        "Ref": "PrivateSubnet1"
+                    },
+                    {
+                        "Ref": "PrivateSubnet2"
+                    },
+                    {
+                        "Ref": "PrivateSubnet3"
+                    }
+                ],
+                "Type": "application",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ClusterName"
+                                    },
+                                    "internal-alb"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAExternalHTTPSListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "Type": "fixed-response",
+                        "FixedResponseConfig": {
+                            "ContentType": "text/plain",
+                            "MessageBody": "ROSA External ALB",
+                            "StatusCode": "200"
+                        }
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "ROSAExternalALB"
+                },
+                "Port": 443,
+                "Protocol": "HTTPS",
+                "Certificates": [
+                    {
+                        "CertificateArn": {
+                            "Ref": "ACMCertificateArn"
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAInternalHTTPSListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "Type": "fixed-response",
+                        "FixedResponseConfig": {
+                            "ContentType": "text/plain",
+                            "MessageBody": "ROSA Internal ALB",
+                            "StatusCode": "200"
+                        }
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "ROSAInternalALB"
+                },
+                "Port": 443,
+                "Protocol": "HTTPS",
+                "Certificates": [
+                    {
+                        "CertificateArn": {
+                            "Ref": "ACMCertificateArn"
+                        }
+                    }
+                ]
+            }
+        },
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VpcCidr"
+                },
+                "EnableDnsHostnames": true,
+                "EnableDnsSupport": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-VPC"
+                    }
+                ]
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-IGW"
+                    }
+                ]
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "PublicSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PublicSubnet1Cidr"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Public-Subnet-1"
+                    },
+                    {
+                        "Key": "kubernetes.io/role/elb",
+                        "Value": "1"
+                    }
+                ]
+            }
+        },
+        "PublicSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PublicSubnet2Cidr"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Public-Subnet-2"
+                    },
+                    {
+                        "Key": "kubernetes.io/role/elb",
+                        "Value": "1"
+                    }
+                ]
+            }
+        },
+        "PublicSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PublicSubnet3Cidr"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        2,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Public-Subnet-3"
+                    },
+                    {
+                        "Key": "kubernetes.io/role/elb",
+                        "Value": "1"
+                    }
+                ]
+            }
+        },
+        "PrivateSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PrivateSubnet1Cidr"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Private-Subnet-1"
+                    },
+                    {
+                        "Key": "kubernetes.io/role/internal-elb",
+                        "Value": "1"
+                    }
+                ]
+            }
+        },
+        "PrivateSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PrivateSubnet2Cidr"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Private-Subnet-2"
+                    },
+                    {
+                        "Key": "kubernetes.io/role/internal-elb",
+                        "Value": "1"
+                    }
+                ]
+            }
+        },
+        "PrivateSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PrivateSubnet3Cidr"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        2,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Private-Subnet-3"
+                    },
+                    {
+                        "Key": "kubernetes.io/role/internal-elb",
+                        "Value": "1"
+                    }
+                ]
+            }
+        },
+        "NatGatewayEIP1": {
+            "Type": "AWS::EC2::EIP",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "NatGatewayEIP2": {
+            "Type": "AWS::EC2::EIP",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "NatGatewayEIP3": {
+            "Type": "AWS::EC2::EIP",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "NatGateway1": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "NatGatewayEIP1",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                }
+            }
+        },
+        "NatGateway2": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "NatGatewayEIP2",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet2"
+                }
+            }
+        },
+        "NatGateway3": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "NatGatewayEIP3",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet3"
+                }
+            }
+        },
+        "PublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Public-RT"
+                    }
+                ]
+            }
+        },
+        "PublicRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "PrivateRouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Private-RT-1"
+                    }
+                ]
+            }
+        },
+        "PrivateRouteTable2": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Private-RT-2"
+                    }
+                ]
+            }
+        },
+        "PrivateRouteTable3": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ROSA-Private-RT-3"
+                    }
+                ]
+            }
+        },
+        "PrivateRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable1"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NatGateway1"
+                }
+            }
+        },
+        "PrivateRoute2": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable2"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NatGateway2"
+                }
+            }
+        },
+        "PrivateRoute3": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable3"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NatGateway3"
+                }
+            }
+        },
+        "PublicSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            }
+        },
+        "PublicSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet2"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            }
+        },
+        "PublicSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet3"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            }
+        },
+        "PrivateSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrivateSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable1"
+                }
+            }
+        },
+        "PrivateSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrivateSubnet2"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable2"
+                }
+            }
+        },
+        "PrivateSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrivateSubnet3"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable3"
+                }
+            }
+        },
+        "ROSAECSCluster": {
+            "Type": "AWS::ECS::Cluster",
+            "Properties": {
+                "ClusterName": {
+                    "Fn::Sub": "${ClusterName}-rosa-installer"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${ClusterName}-rosa-installer"
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAInstallerTaskRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "ecs-tasks.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "ROSAInstallPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:CreateRole",
+                                        "iam:DeleteRole",
+                                        "iam:GetRole",
+                                        "iam:ListRoles",
+                                        "iam:PutRolePolicy",
+                                        "iam:DeleteRolePolicy",
+                                        "iam:GetRolePolicy",
+                                        "iam:ListRolePolicies",
+                                        "iam:ListAttachedRolePolicies",
+                                        "iam:AttachRolePolicy",
+                                        "iam:DetachRolePolicy",
+                                        "iam:TagRole",
+                                        "iam:UntagRole",
+                                        "iam:ListRoleTags",
+                                        "iam:CreateServiceLinkedRole",
+                                        "iam:DeleteServiceLinkedRole",
+                                        "iam:GetServiceLinkedRoleDeletionStatus",
+                                        "iam:CreateInstanceProfile",
+                                        "iam:DeleteInstanceProfile",
+                                        "iam:GetInstanceProfile",
+                                        "iam:RemoveRoleFromInstanceProfile",
+                                        "iam:AddRoleToInstanceProfile",
+                                        "iam:ListInstanceProfilesForRole",
+                                        "iam:ListInstanceProfiles",
+                                        "iam:TagInstanceProfile",
+                                        "iam:GetPolicy",
+                                        "iam:CreatePolicy",
+                                        "iam:DeletePolicy",
+                                        "iam:ListPolicyVersions",
+                                        "iam:CreatePolicyVersion",
+                                        "iam:DeletePolicyVersion",
+                                        "iam:SetDefaultPolicyVersion",
+                                        "iam:GetPolicyVersion",
+                                        "iam:TagPolicy",
+                                        "iam:PassRole",
+                                        "iam:ListPolicyTags"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:*",
+                                        "elasticloadbalancing:*",
+                                        "cloudwatch:*",
+                                        "s3:*",
+                                        "sts:AssumeRole",
+                                        "sts:GetCallerIdentity",
+                                        "logs:*",
+                                        "route53:*",
+                                        "route53domains:*",
+                                        "tag:*",
+                                        "servicequotas:*",
+                                        "organizations:DescribeOrganization",
+                                        "organizations:ListAccounts",
+                                        "organizations:DescribeAccount",
+                                        "organizations:ListTagsForResource"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:CreateGrant",
+                                        "kms:DescribeKey",
+                                        "kms:GenerateDataKeyWithoutPlaintext",
+                                        "kms:Decrypt",
+                                        "kms:Encrypt",
+                                        "kms:ReEncrypt*",
+                                        "kms:GenerateDataKey",
+                                        "kms:ListKeys",
+                                        "kms:ListAliases"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "sts:AssumeRole",
+                                        "sts:AssumeRoleWithWebIdentity",
+                                        "sts:GetFederationToken",
+                                        "sts:GetSessionToken",
+                                        "sts:TagSession"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": "ROSAInstallerPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:CreateOpenIDConnectProvider",
+                                        "iam:DeleteOpenIDConnectProvider",
+                                        "iam:GetOpenIDConnectProvider",
+                                        "iam:UpdateOpenIDConnectProviderThumbprint",
+                                        "iam:AddClientIDToOpenIDConnectProvider",
+                                        "iam:RemoveClientIDFromOpenIDConnectProvider"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:oidc-provider/*"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:TagOpenIDConnectProvider",
+                                        "iam:UntagOpenIDConnectProvider"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:oidc-provider/*"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:CreateRole",
+                                        "iam:DeleteRole",
+                                        "iam:GetRole",
+                                        "iam:ListRolePolicies",
+                                        "iam:ListAttachedRolePolicies",
+                                        "iam:PutRolePolicy",
+                                        "iam:DeleteRolePolicy",
+                                        "iam:AttachRolePolicy",
+                                        "iam:DetachRolePolicy",
+                                        "iam:TagRole",
+                                        "iam:UntagRole"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/operator.openshift.io/*"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:CreateServiceLinkedRole"
+                                    ],
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "iam:AWSServiceName": [
+                                                "operator.openshift.io"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAInstallerExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ecs-tasks.amazonaws.com",
+                                    "cloudformation.amazonaws.com"
+                                ]
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "CloudWatchLogsPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents",
+                                        "logs:CreateLogGroup"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${ClusterName}-rosa-installer:*"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSALogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": {
+                    "Fn::Sub": "/ecs/${ClusterName}-rosa-installer"
+                },
+                "RetentionInDays": 14
+            }
+        },
+        "ROSAInstallerTaskDefinition": {
+            "Type": "AWS::ECS::TaskDefinition",
+            "Properties": {
+                "Family": {
+                    "Fn::Sub": "${ClusterName}-rosa-installer"
+                },
+                "RequiresCompatibilities": [
+                    "FARGATE"
+                ],
+                "NetworkMode": "awsvpc",
+                "Cpu": "2048",
+                "Memory": "4096",
+                "ExecutionRoleArn": {
+                    "Fn::GetAtt": [
+                        "ROSAInstallerExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "TaskRoleArn": {
+                    "Fn::GetAtt": [
+                        "ROSAInstallerTaskRole",
+                        "Arn"
+                    ]
+                },
+                "ContainerDefinitions": [
+                    {
+                        "Name": "rosa-installer",
+                        "Image": "amazonlinux:2",
+                        "Essential": true,
+                        "LogConfiguration": {
+                            "LogDriver": "awslogs",
+                            "Options": {
+                                "awslogs-group": {
+                                    "Ref": "ROSALogGroup"
+                                },
+                                "awslogs-region": {
+                                    "Ref": "AWS::Region"
+                                },
+                                "awslogs-stream-prefix": "rosa-installer",
+                                "awslogs-create-group": "true"
+                            }
+                        },
+                        "Command": [
+                            "/bin/bash",
+                            "-c",
+                            {
+                                "Fn::Join": [
+                                    "\n",
+                                    [
+                                        "set -ex",
+                                        "echo 'Starting ROSA installation process'",
+                                        "# Install required packages",
+                                        "yum update -y",
+                                        "yum install -y wget tar gzip curl jq awscli ca-certificates",
+                                        "# Download ROSA CLI",
+                                        "echo 'Downloading ROSA CLI'",
+                                        "wget -v https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/rosa/latest/rosa-linux.tar.gz || { echo 'Failed to download ROSA CLI'; exit 1; }",
+                                        "# Extract ROSA CLI",
+                                        "echo 'Extracting ROSA CLI'",
+                                        "tar xvf rosa-linux.tar.gz || { echo 'Failed to extract ROSA CLI'; exit 1; }",
+                                        "# Make executable and move to PATH",
+                                        "chmod +x rosa",
+                                        "mv rosa /usr/local/bin/",
+                                        "# Verify ROSA CLI installation",
+                                        "echo 'ROSA CLI version:'",
+                                        "rosa version || { echo 'Failed to run ROSA CLI'; exit 1; }",
+                                        "# Debug: Print AWS identity",
+                                        "echo 'AWS identity:'",
+                                        "aws sts get-caller-identity",
+                                        "# Attempt ROSA login",
+                                        "echo 'Logging in to ROSA'",
+                                        "rosa login --token=\"${ROSAToken}\" || { echo 'ROSA login failed'; exit 1; }",
+                                        "# First delete existing OIDC config and operator roles if they exist",
+                                        "echo 'Cleaning up existing resources...'",
+                                        "EXISTING_OIDC=$(rosa list oidc-config --output json | jq -r '.[].id')",
+                                        "if [ ! -z \"$EXISTING_OIDC\" ]; then",
+                                        "  echo 'Deleting existing operator roles...'",
+                                        "  rosa delete operator-roles --prefix rsclst --mode auto --yes || true",
+                                        "  echo 'Deleting existing OIDC config...'",
+                                        "  rosa delete oidc-config --oidc-config-id \"$EXISTING_OIDC\" --mode auto --yes || true",
+                                        "fi",
+                                        "# Create account roles",
+                                        "echo 'Creating ROSA account roles'",
+                                        "rosa create account-roles --classic --mode auto --yes || { echo 'Failed to create account roles'; exit 1; }",
+                                        "# Get account role ARNs",
+                                        "echo 'Getting account role ARNs'",
+                                        "ACCOUNT_ROLES_JSON=$(rosa list account-roles --output json)",
+                                        "echo \"Account roles JSON: ${ACCOUNT_ROLES_JSON}\"",
+                                        "# Debug: Show the structure of the JSON",
+                                        "echo 'JSON structure:'",
+                                        "echo \"${ACCOUNT_ROLES_JSON}\" | jq '.'",
+                                        "# Extract role ARNs",
+                                        "INSTALLER_ROLE_ARN=$(echo \"${ACCOUNT_ROLES_JSON}\" | jq -r '.[] | select(.RoleName==\"ManagedOpenShift-Installer-Role\") | .RoleARN')",
+                                        "WORKER_ROLE_ARN=$(echo \"${ACCOUNT_ROLES_JSON}\" | jq -r '.[] | select(.RoleName==\"ManagedOpenShift-Worker-Role\") | .RoleARN')",
+                                        "SUPPORT_ROLE_ARN=$(echo \"${ACCOUNT_ROLES_JSON}\" | jq -r '.[] | select(.RoleName==\"ManagedOpenShift-Support-Role\") | .RoleARN')",
+                                        "CONTROL_PLANE_ROLE_ARN=$(echo \"${ACCOUNT_ROLES_JSON}\" | jq -r '.[] | select(.RoleName==\"ManagedOpenShift-ControlPlane-Role\") | .RoleARN')",
+                                        "# Debug: Print extracted ARNs",
+                                        "echo \"Installer Role ARN: ${INSTALLER_ROLE_ARN}\"",
+                                        "echo \"Worker Role ARN: ${WORKER_ROLE_ARN}\"",
+                                        "echo \"Support Role ARN: ${SUPPORT_ROLE_ARN}\"",
+                                        "echo \"Control Plane Role ARN: ${CONTROL_PLANE_ROLE_ARN}\"",
+                                        "# Verify all ARNs are present",
+                                        "if [ -z \"${INSTALLER_ROLE_ARN}\" ] || [ -z \"${WORKER_ROLE_ARN}\" ] || [ -z \"${SUPPORT_ROLE_ARN}\" ] || [ -z \"${CONTROL_PLANE_ROLE_ARN}\" ]; then",
+                                        "    echo 'Failed to get all required role ARNs'",
+                                        "    exit 1",
+                                        "fi",
+                                        "# Create OIDC provider",
+                                        "echo 'Creating OIDC provider'",
+                                        "OIDC_CONFIG_ID=$(rosa create oidc-config --mode auto --yes --output json | jq -r '.id') || { echo 'Failed to create OIDC provider'; exit 1; }",
+                                        "echo 'Created OIDC config with ID: ${OIDC_CONFIG_ID}'",
+                                        "# Wait for OIDC provider to be ready",
+                                        "echo 'Waiting for OIDC provider to be ready...'",
+                                        "sleep 30",
+                                        "# Create operator roles",
+                                        "echo 'Creating ROSA operator roles'",
+                                        "rosa create operator-roles --prefix ${CLUSTER_NAME} --oidc-config-id ${OIDC_CONFIG_ID} --role-arn ${INSTALLER_ROLE_ARN} --mode auto --yes || { echo 'Failed to create operator roles'; exit 1; }",
+                                        "# Create ROSA cluster",
+                                        "echo 'Creating ROSA cluster'",
+                                        "rosa create cluster \\",
+                                        "  --name ${CLUSTER_NAME} \\",
+                                        "  --version ${VERSION} \\",
+                                        "  --region ${AWS_DEFAULT_REGION} \\",
+                                        "  --subnet-ids ${PRIVATE_SUBNETS},${PUBLIC_SUBNETS} \\",
+                                        "  --machine-cidr 10.0.0.0/16 \\",
+                                        "  --service-cidr 172.30.0.0/16 \\",
+                                        "  --pod-cidr 10.128.0.0/14 \\",
+                                        "  --host-prefix 23 \\",
+                                        "  --compute-machine-type ${WORKER_INSTANCE_TYPE} \\",
+                                        "  --compute-nodes ${WORKER_NODE_COUNT} \\",
+                                        "  --multi-az \\",
+                                        "  --mode auto \\",
+                                        "  --operator-roles-prefix ${CLUSTER_NAME} \\",
+                                        "  --oidc-config-id ${OIDC_CONFIG_ID} \\",
+                                        "  --installer-role-arn \"${INSTALLER_ROLE_ARN}\" \\",
+                                        "  --worker-iam-role-arn \"${WORKER_ROLE_ARN}\" \\",
+                                        "  --support-role-arn \"${SUPPORT_ROLE_ARN}\" \\",
+                                        "  --controlplane-iam-role-arn \"${CONTROL_PLANE_ROLE_ARN}\" \\",
+                                        "  --yes \\",
+                                        "  --debug || { echo 'Cluster creation command failed'; exit 1; }",
+                                        "# Wait for cluster creation to start",
+                                        "echo 'Waiting for cluster creation to start'",
+                                        "sleep 30",
+                                        "# Monitor installation",
+                                        "echo 'Starting cluster creation monitoring'",
+                                        "rosa logs install --cluster ${CLUSTER_NAME} --watch || { echo 'Failed to get installation logs'; exit 1; }",
+                                        "# Check cluster status in a loop",
+                                        "MAX_RETRIES=50",
+                                        "RETRY_COUNT=0",
+                                        "while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do",
+                                        "    echo \"Checking cluster status (Attempt $((RETRY_COUNT+1)) of $MAX_RETRIES)\"",
+                                        "    CLUSTER_STATUS=$(rosa describe cluster --cluster ${CLUSTER_NAME} --output json | jq -r '.status.state')",
+                                        "    echo \"Current cluster status: $CLUSTER_STATUS\"",
+                                        
+                                        "    if [ \"$CLUSTER_STATUS\" == \"ready\" ]; then",
+                                        "        echo 'Cluster is ready, signaling success'",
+                                        "        # Signal success to CloudFormation",
+                                        "        curl -X PUT -H 'Content-Type:' \\",
+                                        "            --data-binary '{\"Status\": \"SUCCESS\",\"Reason\": \"ROSA Cluster creation completed successfully\",\"Data\": \"Cluster is ready\",\"UniqueId\": \"ROSACluster\"}' \\",
+                                        "            \"${WaitHandleUrl}\"",
+                                        "        exit 0",
+                                        "    elif [[ \"$CLUSTER_STATUS\" =~ ^(error|failed|installing)$ ]]; then",
+                                        "        echo 'Cluster creation failed'",
+                                        "        # Signal failure to CloudFormation",
+                                        "        curl -X PUT -H 'Content-Type:' \\",
+                                        "            --data-binary '{\"Status\": \"FAILURE\",\"Reason\": \"ROSA Cluster creation failed\",\"Data\": \"Cluster status: $CLUSTER_STATUS\",\"UniqueId\": \"ROSACluster\"}' \\",
+                                        "            \"${WaitHandleUrl}\"",
+                                        "        exit 1",
+                                        "    fi",
+                                        
+                                        "    RETRY_COUNT=$((RETRY_COUNT+1))",
+                                        "    echo \"Waiting 120 seconds before next check...\"",
+                                        "    sleep 120",
+                                        "done",
+                                        
+                                        "# If we get here, we've timed out",
+                                        "echo 'Timed out waiting for cluster to be ready'",
+                                        "curl -X PUT -H 'Content-Type:' \\",
+                                        "    --data-binary '{\"Status\": \"FAILURE\",\"Reason\": \"Timeout waiting for ROSA cluster\",\"Data\": \"Timed out after $MAX_RETRIES attempts\",\"UniqueId\": \"ROSACluster\"}' \\",
+                                        "    \"${WaitHandleUrl}\"",
+                                        "exit 1"
+                                    ]
+                                ]
+                            }
+                        ],
+                        "Environment": [
+                            {
+                                "Name": "CLUSTER_NAME",
+                                "Value": {
+                                    "Ref": "ClusterName"
+                                }
+                            },
+                            {
+                                "Name": "VERSION",
+                                "Value": {
+                                    "Ref": "Version"
+                                }
+                            },
+                            {
+                                "Name": "PRIVATE_SUBNETS",
+                                "Value": {
+                                    "Fn::Join": [
+                                        ",",
+                                        [
+                                            {
+                                                "Ref": "PrivateSubnet1"
+                                            },
+                                            {
+                                                "Ref": "PrivateSubnet2"
+                                            },
+                                            {
+                                                "Ref": "PrivateSubnet3"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            },
+                            {
+                                "Name": "PUBLIC_SUBNETS",
+                                "Value": {
+                                    "Fn::Join": [
+                                        ",",
+                                        [
+                                            {
+                                                "Ref": "PublicSubnet1"
+                                            },
+                                            {
+                                                "Ref": "PublicSubnet2"
+                                            },
+                                            {
+                                                "Ref": "PublicSubnet3"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            },
+                            {
+                                "Name": "WORKER_INSTANCE_TYPE",
+                                "Value": {
+                                    "Ref": "WorkerInstanceType"
+                                }
+                            },
+                            {
+                                "Name": "WORKER_NODE_COUNT",
+                                "Value": {
+                                    "Ref": "WorkerNodeCount"
+                                }
+                            },
+                            {
+                                "Name": "ROSAToken",
+                                "Value": {
+                                    "Ref": "ROSAToken"
+                                }
+                            },
+                            {
+                                "Name": "AWS_DEFAULT_REGION",
+                                "Value": {
+                                    "Ref": "AWS::Region"
+                                }
+                            },
+                            {
+                                "Name": "WaitHandleUrl",
+                                "Value": {
+                                    "Ref": "ROSAClusterWaitHandle"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "ROSAStateMachine": {
+            "Type": "AWS::StepFunctions::StateMachine",
+            "Properties": {
+                "StateMachineName": {
+                    "Fn::Sub": "${ClusterName}-rosa-installer"
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "StepFunctionsRole",
+                        "Arn"
+                    ]
+                },
+                "DefinitionString": {
+                    "Fn::Sub": [
+                        "{\"Comment\":\"ROSA Cluster Installation State Machine\",\"StartAt\":\"RunROSAInstaller\",\"States\":{\"RunROSAInstaller\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::ecs:runTask.sync\",\"Parameters\":{\"LaunchType\":\"FARGATE\",\"Cluster\":\"${ECSCluster}\",\"TaskDefinition\":\"${TaskDef}\",\"NetworkConfiguration\":{\"AwsvpcConfiguration\":{\"Subnets\":[\"${Subnet1}\",\"${Subnet2}\",\"${Subnet3}\"],\"SecurityGroups\":[\"${SecGroup}\"],\"AssignPublicIp\":\"DISABLED\"}}},\"End\":true,\"TimeoutSeconds\":7200,\"Catch\":[{\"ErrorEquals\":[\"States.Timeout\"],\"Next\":\"HandleTimeout\"},{\"ErrorEquals\":[\"States.ALL\"],\"Next\":\"HandleError\"}]},\"HandleTimeout\":{\"Type\":\"Fail\",\"Cause\":\"Installation timed out\"},\"HandleError\":{\"Type\":\"Fail\",\"Cause\":\"Installation failed\"}}}",
+                        {
+                            "ECSCluster": {
+                                "Ref": "ROSAECSCluster"
+                            },
+                            "TaskDef": {
+                                "Ref": "ROSAInstallerTaskDefinition"
+                            },
+                            "Subnet1": {
+                                "Ref": "PrivateSubnet1"
+                            },
+                            "Subnet2": {
+                                "Ref": "PrivateSubnet2"
+                            },
+                            "Subnet3": {
+                                "Ref": "PrivateSubnet3"
+                            },
+                            "SecGroup": {
+                                "Ref": "ROSANodeSecurityGroup"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "StepFunctionsLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": {
+                    "Fn::Sub": "/aws/states/${ClusterName}-rosa-wait"
+                },
+                "RetentionInDays": 14
+            }
+        },
+        "StepFunctionsRole": {
+            "Type": "AWS::IAM::Role",
+            "DependsOn": [
+                "StepFunctionsLogGroup"
+            ],
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "states.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "StepFunctionsExecutionPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogDelivery",
+                                        "logs:GetLogDelivery",
+                                        "logs:UpdateLogDelivery",
+                                        "logs:DeleteLogDelivery",
+                                        "logs:ListLogDeliveries",
+                                        "logs:PutResourcePolicy",
+                                        "logs:DescribeResourcePolicies",
+                                        "logs:DescribeLogGroups"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents",
+                                        "logs:GetLogEvents",
+                                        "logs:GetLogGroupFields",
+                                        "logs:GetQueryResults"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "StepFunctionsLogGroup",
+                                                "Arn"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "events:PutRule",
+                                        "events:PutTargets",
+                                        "events:DescribeRule",
+                                        "events:DeleteRule",
+                                        "events:RemoveTargets"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForECSTaskRule"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ecs:RunTask",
+                                        "ecs:StopTask",
+                                        "ecs:DescribeTasks"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:PassRole"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "ROSAInstallerExecutionRole",
+                                                "Arn"
+                                            ]
+                                        },
+                                        {
+                                            "Fn::GetAtt": [
+                                                "ROSAInstallerTaskRole",
+                                                "Arn"
+                                            ]
+                                        }
+                                    ],
+                                    "Condition": {
+                                        "StringLike": {
+                                            "iam:PassedToService": "ecs-tasks.amazonaws.com"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAClusterTriggerRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "StepFunctionsStartExecution",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "states:StartExecution"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Ref": "ROSAStateMachine"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "states:DescribeExecution",
+                                        "states:StopExecution"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:${AWS::StackName}-rosa-status-check:*"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ROSAClusterTrigger": {
+            "Type": "AWS::Lambda::Function",
+            "DependsOn": [
+                "ROSAClusterTriggerRole"
+            ],
+            "Properties": {
+                "Handler": "index.handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "ROSAClusterTriggerRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "import boto3",
+                                "import json",
+                                "import cfnresponse",
+                                "",
+                                "def handler(event, context):",
+                                "    print(f'Received event: {json.dumps(event)}')",
+                                "    cluster_name = event['ResourceProperties'].get('ClusterName')",
+                                "",
+                                "    if event['RequestType'] in ['Create', 'Update']:",
+                                "        try:",
+                                "            sfn = boto3.client('stepfunctions')",
+                                "            # Start ROSA installation",
+                                "            rosa_execution = sfn.start_execution(",
+                                "                stateMachineArn=event['ResourceProperties']['ROSAStateMachineArn']",
+                                "            )",
+                                "",
+                                "            cfnresponse.send(event, context, cfnresponse.SUCCESS, {",
+                                "                'ROSAExecutionArn': rosa_execution['executionArn']  })",
+                                "",
+                                "        except Exception as e:",
+                                "            print(f'Error: {str(e)}')",
+                                "            cfnresponse.send(event, context, cfnresponse.FAILED, {",
+                                "                'Error': str(e)",
+                                "            })",
+                                "",
+                                "    elif event['RequestType'] == 'Delete':",
+                                "        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})"
+                            ]
+                        ]
+                    }
+                },
+                "Runtime": "python3.9",
+                "Timeout": 60
+            }
+        },
+        "ROSAClusterDeployment": {
+            "Type": "Custom::ROSAClusterDeployment",
+            "DependsOn": [
+                "ROSAStateMachine",
+                "ROSAClusterTrigger"
+            ],
+            "Properties": {
+                "ServiceToken": {
+                    "Fn::GetAtt": [
+                        "ROSAClusterTrigger",
+                        "Arn"
+                    ]
+                },
+                "ROSAStateMachineArn": {
+                    "Ref": "ROSAStateMachine"
+                },
+                "ClusterName": {
+                    "Ref": "ClusterName"
+                }
+            }
+        },
+        "ROSAClusterWaitHandle": {
+            "Type": "AWS::CloudFormation::WaitConditionHandle",
+            "Properties": {}
+        },
+        "ROSAClusterWaitCondition": {
+            "Type": "AWS::CloudFormation::WaitCondition",
+            "DependsOn": ["ROSAInstallerTaskDefinition", "ROSAClusterDeployment"],
+            "Properties": {
+                "Handle": {
+                    "Ref": "ROSAClusterWaitHandle"
+                },
+                "Timeout": "7200",
+                "Count": 1
+            }
+        }
+    },
+    "Outputs": {
+        "ClusterName": {
+            "Description": "Name of the ROSA cluster",
+            "Value": {
+                "Ref": "ClusterName"
+            }
+        },
+        "VpcId": {
+            "Description": "VPC ID",
+            "Value": {
+                "Ref": "VPC"
+            }
+        },
+        "PublicSubnets": {
+            "Description": "Public Subnet IDs",
+            "Value": {
+                "Fn::Join": [
+                    ",",
+                    [
+                        {
+                            "Ref": "PublicSubnet1"
+                        },
+                        {
+                            "Ref": "PublicSubnet2"
+                        },
+                        {
+                            "Ref": "PublicSubnet3"
+                        }
+                    ]
+                ]
+            }
+        },
+        "PrivateSubnets": {
+            "Description": "Private Subnet IDs",
+            "Value": {
+                "Fn::Join": [
+                    ",",
+                    [
+                        {
+                            "Ref": "PrivateSubnet1"
+                        },
+                        {
+                            "Ref": "PrivateSubnet2"
+                        },
+                        {
+                            "Ref": "PrivateSubnet3"
+                        }
+                    ]
+                ]
+            }
+        },
+        "TotalNodes": {
+            "Description": "Total number of nodes in the cluster",
+            "Value": {
+                "Fn::Join": [
+                    " ",
+                    [
+                        "3 Master Nodes (m5.2xlarge),",
+                        "3 Infrastructure Nodes (r5.xlarge),",
+                        {
+                            "Ref": "WorkerNodeCount"
+                        },
+                        "Worker Nodes (m5.xlarge)"
+                    ]
+                ]
+            }
+        },
+        "ExternalLoadBalancerDNS": {
+            "Description": "DNS name of the external load balancer",
+            "Value": {
+                "Fn::GetAtt": [
+                    "ROSAExternalALB",
+                    "DNSName"
+                ]
+            }
+        },
+        "InternalLoadBalancerDNS": {
+            "Description": "DNS name of the internal load balancer",
+            "Value": {
+                "Fn::GetAtt": [
+                    "ROSAInternalALB",
+                    "DNSName"
+                ]
+            }
+        },
+        "BastionHostIP": {
+            "Description": "Public IP address of the bastion host",
+            "Value": {
+                "Ref": "BastionEIP"
+            }
+        },
+        "SSHCommand": {
+            "Description": "Command to SSH into bastion host",
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "ssh -i ",
+                        {
+                            "Ref": "SSHKeyName"
+                        },
+                        ".pem ec2-user@",
+                        {
+                            "Ref": "BastionEIP"
+                        }
+                    ]
+                ]
+            }
+        },
+        "StateMachineArn": {
+            "Description": "ARN of the Step Functions state machine",
+            "Value": {
+                "Ref": "ROSAStateMachine"
+            }
+        },
+        "ECSClusterName": {
+            "Description": "Name of the ECS cluster",
+            "Value": {
+                "Ref": "ROSAECSCluster"
+            }
+        },
+        "TaskDefinitionArn": {
+            "Description": "ARN of the ECS task definition",
+            "Value": {
+                "Ref": "ROSAInstallerTaskDefinition"
+            }
+        },
+        "ROSAClusterStatus": {
+            "Description": "Status of ROSA cluster creation",
+            "Value": {
+                "Fn::GetAtt": [
+                    "ROSAClusterWaitCondition",
+                    "Data"
+                ]
+            }
+        }
+    }
+}

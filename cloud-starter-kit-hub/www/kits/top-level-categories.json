@@ -28,11 +28,12 @@
     },
     {
         "Label": "Advanced Solutions",
-        "Description": "These advanced solutions cover more complex applications and services,, including solutions from third party vendors.",
+        "Description": "These advanced solutions cover more complex applications and services, including solutions from third party vendors.",
         "CategoryOrder": [
             "Call Center/Communications",
             "EUC/VDI Solutions",
-            "Generative AI"
+            "Generative AI",
+            "Migration"
         ]
     }
 ]
