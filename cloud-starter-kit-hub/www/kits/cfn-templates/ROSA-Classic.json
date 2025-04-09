@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "Complete ROSA Classic Infrastructure with VPC and Cluster - Multi-AZ with Master, Infrastructure, and Worker nodes. Please make sure you complete all the pre-requisites before running this template.",
+    "Description": "Complete ROSA Classic Infrastructure with VPC and Cluster - Multi-AZ with Master (m5.2xlarge), Infrastructure (r5.xlarge), and Worker nodes (m5.xlarge). Please make sure you complete all the pre-requisites before running this template.",
     "Parameters": {
         "VpcCidr": {
             "Type": "String",
@@ -45,16 +45,6 @@
             "Type": "String",
             "Default": "4.18.5",
             "Description": "OpenShift version for the cluster"
-        },
-        "MasterInstanceType": {
-            "Type": "String",
-            "Default": "m5.2xlarge",
-            "Description": "EC2 instance type for master nodes"
-        },
-        "InfrastructureInstanceType": {
-            "Type": "String",
-            "Default": "r5.xlarge",
-            "Description": "EC2 instance type for infrastructure nodes"
         },
         "WorkerInstanceType": {
             "Type": "String",
