@@ -1,6 +1,6 @@
 /*
-* Utility methods
-*/
+ * Utility methods
+ */
 
 const parser = new DOMParser();
 
@@ -15,54 +15,49 @@ function appendHtmlToNode(node, html, replace = true) {
 }
 
 function bytesToBase64(bytes) {
-  const binString = Array.from(bytes, (byte) =>
-    String.fromCodePoint(byte),
-  ).join("");
+  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
   return btoa(binString);
 }
 
 function findNameFromTags(tags) {
   for (let i = 0; i < tags.length; i++) {
     if (tags[i]["Key"] === "Name") {
-      return tags[i]["Value"]
+      return tags[i]["Value"];
     }
   }
-  return ""
+  return "";
 }
 
 function findSubnetTypeFromTags(tags) {
   for (let i = 0; i < tags.length; i++) {
     if (tags[i]["Key"] === "aws-cdk:subnet-type") {
-      return tags[i]["Value"].toLowerCase()
+      return tags[i]["Value"].toLowerCase();
     }
   }
-  return ""
+  return "";
 }
 
 function guessSubnetType(name) {
   if (name.toLowerCase().includes("isolated")) {
-    return "isolated"
+    return "isolated";
+  } else if (name.toLowerCase().includes("private")) {
+    return "private";
+  } else if (name.toLowerCase().includes("public")) {
+    return "public";
   }
-  else if (name.toLowerCase().includes("private")) {
-    return "private"
-  }
-  else if (name.toLowerCase().includes("public")) {
-    return "public"
-  }
-  return ""
+  return "";
 }
 
 const getMyIp = async () => {
-  const response = await fetch('https://api.ipify.org/?format=json');
+  const response = await fetch("https://api.ipify.org/?format=json");
   const json = await response.json();
   console.log(json);
   if (json.hasOwnProperty("ip") && json.ip.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
     return json.ip;
-  }
-  else {
+  } else {
     return "";
   }
-}
+};
 
 function openConsole(url) {
   window.openInBrowser(url);
@@ -106,7 +101,10 @@ function convertRegionCodeToName(code) {
     "eu-south-2": "ES: Spain",
     "il-central-1": "IL: Tel Aviv",
     "me-central-1": "AE: UAE",
-    "me-south-1": "BH: Bahrain"
-  }
+    "me-south-1": "BH: Bahrain",
+    "mx-central-1": "MX: Mexico",
+    "ap-southeast-7": "TH: Thailand",
+    "ap-southeast-6": "NZ: Auckland",
+  };
   return codes.hasOwnProperty(code) ? codes[code] : code;
 }

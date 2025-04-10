@@ -31,7 +31,7 @@
           "Name": "Single EC2 instance",
           "Description": "A kit to create a single server instance. Each unique server name you specify will be created in its own CloudFormation stack. You can create instances using either x86 or Arm processors, with Windows, Amazon Linux or Ubuntu AWS-managed AMIs. You can customise the Userdata that will be run when the instance is brought online - by default the supplied script will install a web server as well as utilities to enable the instance to be accessed via the AWS console.",
           "Manifest": "ec2.json",
-          "AllowUpdates": false,
+          "AllowUpdates": true,
           "Copyright": "© Guy Morton 2024",
           "MoreInfo": "<img style='width:300px' target='_blank' src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>Here is some more info and a <a href='https://aws.amazon.com/'>Link</a>"
         }
@@ -45,7 +45,7 @@
           "Name": "EC2 Auto Scaling Group with DNS hostname",
           "Description": "This kit creates an auto scaling group of EC2 instances and an Application Load Balancer with a DNS hostname and TLS certificate. Each unique server name you specify will be created in its own CloudFormation stack. You can create instances using either x86 or Arm processors, with Windows, Amazon Linux or Ubuntu AWS-managed AMIs. You can customise the Userdata that will be run when the instance is brought online - by default the supplied script will install a web server as well as utilities to enable the instance to be accessed via the AWS console.",
           "Manifest": "ec2-asg-dns.json",
-          "AllowUpdates": false,
+          "AllowUpdates": true,
           "Copyright": "© Guy Morton 2024",
           "MoreInfo": "<img style='width:300px' target='_blank' src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>Here is some more info and a <a href='https://aws.amazon.com/'>Link</a>"
         }
