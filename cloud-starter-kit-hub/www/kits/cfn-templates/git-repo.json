@@ -255,7 +255,7 @@
             "Type": "AWS::CloudFormation::Stack",
             "Properties": {
                 "TemplateURL": {
-                    "Fn::Sub": "https://${AWS::Region}-tcprod.s3.amazonaws.com/courses/aws-tc-lab-common-resources/lambda-functions/generaterandomalphanumeric/yml/generate-random-alpha-number.yml"
+                    "Fn::Sub": "https://${AWS::Region}-${AWS::Account}-tcprod.s3.amazonaws.com/courses/aws-tc-lab-common-resources/lambda-functions/generaterandomalphanumeric/yml/generate-random-alpha-number.yml"
                 },
                 "Parameters": {
                     "PasswordLength": 4,
