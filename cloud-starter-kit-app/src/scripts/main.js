@@ -26,6 +26,10 @@ process.env.CONFIG_HOST = "admin.cloud-starter-kit.com";
 process.env.ADMIN_HOST = "admin.cloud-starter-kit.com";
 process.env.FILE_HOST = "kits.cloud-starter-kit.com";
 
+// process.env.CONFIG_HOST = "admin.cskingrammicro.com.au";
+// process.env.ADMIN_HOST = "admin.cskingrammicro.com.au";
+// process.env.FILE_HOST = "d2cfn5jr5y9smy.cloudfront.net";
+
 const HOSTS = {
   CONFIG_HOST: process.env.CONFIG_HOST,
   ADMIN_HOST: process.env.ADMIN_HOST,

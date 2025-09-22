@@ -1,1084 +1,1009 @@
 {
- "Resources": {
-  "PipelineArtifactsBucket22248F97": {
-   "Type": "AWS::S3::Bucket",
-   "Properties": {
-    "BucketEncryption": {
-     "ServerSideEncryptionConfiguration": [
-      {
-       "ServerSideEncryptionByDefault": {
-        "SSEAlgorithm": "aws:kms"
-       }
-      }
-     ]
-    },
-    "PublicAccessBlockConfiguration": {
-     "BlockPublicAcls": true,
-     "BlockPublicPolicy": true,
-     "IgnorePublicAcls": true,
-     "RestrictPublicBuckets": true
-    }
-   },
-   "UpdateReplacePolicy": "Retain",
-   "DeletionPolicy": "Retain",
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/ArtifactsBucket/Resource"
-   }
-  },
-  "PipelineArtifactsBucketPolicyD4F9712A": {
-   "Type": "AWS::S3::BucketPolicy",
-   "Properties": {
-    "Bucket": {
-     "Ref": "PipelineArtifactsBucket22248F97"
-    },
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": "s3:*",
-       "Condition": {
-        "Bool": {
-         "aws:SecureTransport": "false"
-        }
-       },
-       "Effect": "Deny",
-       "Principal": {
-        "AWS": "*"
-       },
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "PipelineArtifactsBucket22248F97",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "PipelineArtifactsBucket22248F97",
-             "Arn"
-            ]
-           },
-           "/*"
+  "Resources": {
+    "PipelineArtifactsBucket22248F97": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "aws:kms"
+              }
+            }
           ]
-         ]
-        }
-       ]
-      }
-     ],
-     "Version": "2012-10-17"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/ArtifactsBucket/Policy/Resource"
-   }
-  },
-  "PipelineRoleD68726F7": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "Service": "codepipeline.amazonaws.com"
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Role/Resource"
-   }
-  },
-  "PipelineRoleDefaultPolicyC7A05455": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": [
-        "s3:Abort*",
-        "s3:DeleteObject*",
-        "s3:GetBucket*",
-        "s3:GetObject*",
-        "s3:List*",
-        "s3:PutObject",
-        "s3:PutObjectLegalHold",
-        "s3:PutObjectRetention",
-        "s3:PutObjectTagging",
-        "s3:PutObjectVersionTagging"
-       ],
-       "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "PipelineArtifactsBucket22248F97",
-          "Arn"
-         ]
         },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "PipelineArtifactsBucket22248F97",
-             "Arn"
-            ]
-           },
-           "/*"
-          ]
-         ]
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
         }
-       ]
       },
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "PipelineBuildCodePipelineActionRoleD77A08E6",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::GetAtt": [
-          "PipelineSourceS3SourceCodePipelineActionRole8DE11A40",
-          "Arn"
-         ]
-        }
-       ]
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/ArtifactsBucket/Resource"
       }
-     ],
-     "Version": "2012-10-17"
     },
-    "PolicyName": "PipelineRoleDefaultPolicyC7A05455",
-    "Roles": [
-     {
-      "Ref": "PipelineRoleD68726F7"
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Role/DefaultPolicy/Resource"
-   }
-  },
-  "PipelineC660917D": {
-   "Type": "AWS::CodePipeline::Pipeline",
-   "Properties": {
-    "ArtifactStore": {
-     "Location": {
-      "Ref": "PipelineArtifactsBucket22248F97"
-     },
-     "Type": "S3"
-    },
-    "ExecutionMode": "PARALLEL",
-    "PipelineType": "V2",
-    "RoleArn": {
-     "Fn::GetAtt": [
-      "PipelineRoleD68726F7",
-      "Arn"
-     ]
-    },
-    "Stages": [
-     {
-      "Actions": [
-       {
-        "ActionTypeId": {
-         "Category": "Source",
-         "Owner": "AWS",
-         "Provider": "S3",
-         "Version": "1"
+    "PipelineArtifactsBucketPolicyD4F9712A": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "PipelineArtifactsBucket22248F97"
         },
-        "Configuration": {
-         "S3Bucket": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/ArtifactsBucket/Policy/Resource"
+      }
+    },
+    "PipelineRoleD68726F7": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Role/Resource"
+      }
+    },
+    "PipelineRoleDefaultPolicyC7A05455": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:Abort*",
+                "s3:DeleteObject*",
+                "s3:GetBucket*",
+                "s3:GetObject*",
+                "s3:List*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["PipelineBuildCodePipelineActionRoleD77A08E6", "Arn"]
+                },
+                {
+                  "Fn::GetAtt": ["PipelineSourceS3SourceCodePipelineActionRole8DE11A40", "Arn"]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "PipelineRoleDefaultPolicyC7A05455",
+        "Roles": [
+          {
+            "Ref": "PipelineRoleD68726F7"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Role/DefaultPolicy/Resource"
+      }
+    },
+    "PipelineC660917D": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "ArtifactStore": {
+          "Location": {
+            "Ref": "PipelineArtifactsBucket22248F97"
+          },
+          "Type": "S3"
+        },
+        "ExecutionMode": "PARALLEL",
+        "PipelineType": "V2",
+        "RoleArn": {
+          "Fn::GetAtt": ["PipelineRoleD68726F7", "Arn"]
+        },
+        "Stages": [
+          {
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "AWS",
+                  "Provider": "S3",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "S3Bucket": {
+                    "Ref": "CskSourceBucket7D65FE4B"
+                  },
+                  "S3ObjectKey": "csk-cdk-app.zip",
+                  "PollForSourceChanges": false
+                },
+                "Name": "S3Source",
+                "OutputArtifacts": [
+                  {
+                    "Name": "Artifact_Source_S3Source"
+                  }
+                ],
+                "RoleArn": {
+                  "Fn::GetAtt": ["PipelineSourceS3SourceCodePipelineActionRole8DE11A40", "Arn"]
+                },
+                "RunOrder": 1
+              }
+            ],
+            "Name": "Source"
+          },
+          {
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {
+                    "Ref": "BuildProject097C5DB7"
+                  }
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "Artifact_Source_S3Source"
+                  }
+                ],
+                "Name": "Build",
+                "OutputArtifacts": [
+                  {
+                    "Name": "Artifact_Build_Build"
+                  }
+                ],
+                "RoleArn": {
+                  "Fn::GetAtt": ["PipelineBuildCodePipelineActionRoleD77A08E6", "Arn"]
+                },
+                "RunOrder": 1
+              }
+            ],
+            "Name": "Build"
+          }
+        ]
+      },
+      "DependsOn": ["PipelineRoleDefaultPolicyC7A05455", "PipelineRoleD68726F7"],
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Resource"
+      }
+    },
+    "PipelineSourceS3SourceCodePipelineActionRole8DE11A40": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Source/S3Source/CodePipelineActionRole/Resource"
+      }
+    },
+    "PipelineSourceS3SourceCodePipelineActionRoleDefaultPolicy352A3912": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": ["s3:GetBucket*", "s3:GetObject*", "s3:List*"],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["CskSourceBucket7D65FE4B", "Arn"]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["CskSourceBucket7D65FE4B", "Arn"]
+                      },
+                      "/csk-cdk-app.zip"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:Abort*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "PipelineSourceS3SourceCodePipelineActionRoleDefaultPolicy352A3912",
+        "Roles": [
+          {
+            "Ref": "PipelineSourceS3SourceCodePipelineActionRole8DE11A40"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Source/S3Source/CodePipelineActionRole/DefaultPolicy/Resource"
+      }
+    },
+    "PipelineBuildCodePipelineActionRoleD77A08E6": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Build/Build/CodePipelineActionRole/Resource"
+      }
+    },
+    "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": ["codebuild:BatchGetBuilds", "codebuild:StartBuild", "codebuild:StopBuild"],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": ["BuildProject097C5DB7", "Arn"]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8",
+        "Roles": [
+          {
+            "Ref": "PipelineBuildCodePipelineActionRoleD77A08E6"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Build/Build/CodePipelineActionRole/DefaultPolicy/Resource"
+      }
+    },
+    "CskSourceBucket7D65FE4B": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "RetainExceptOnCreate",
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CskSourceBucket/Resource"
+      }
+    },
+    "CskSourceBucketPolicy512111C6": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
           "Ref": "CskSourceBucket7D65FE4B"
-         },
-         "S3ObjectKey": "csk-cdk-app.zip",
-         "PollForSourceChanges": false
         },
-        "Name": "S3Source",
-        "OutputArtifacts": [
-         {
-          "Name": "Artifact_Source_S3Source"
-         }
-        ],
-        "RoleArn": {
-         "Fn::GetAtt": [
-          "PipelineSourceS3SourceCodePipelineActionRole8DE11A40",
-          "Arn"
-         ]
-        },
-        "RunOrder": 1
-       }
-      ],
-      "Name": "Source"
-     },
-     {
-      "Actions": [
-       {
-        "ActionTypeId": {
-         "Category": "Build",
-         "Owner": "AWS",
-         "Provider": "CodeBuild",
-         "Version": "1"
-        },
-        "Configuration": {
-         "ProjectName": {
-          "Ref": "BuildProject097C5DB7"
-         }
-        },
-        "InputArtifacts": [
-         {
-          "Name": "Artifact_Source_S3Source"
-         }
-        ],
-        "Name": "Build",
-        "OutputArtifacts": [
-         {
-          "Name": "Artifact_Build_Build"
-         }
-        ],
-        "RoleArn": {
-         "Fn::GetAtt": [
-          "PipelineBuildCodePipelineActionRoleD77A08E6",
-          "Arn"
-         ]
-        },
-        "RunOrder": 1
-       }
-      ],
-      "Name": "Build"
-     }
-    ]
-   },
-   "DependsOn": [
-    "PipelineRoleDefaultPolicyC7A05455",
-    "PipelineRoleD68726F7"
-   ],
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Resource"
-   }
-  },
-  "PipelineSourceS3SourceCodePipelineActionRole8DE11A40": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "AWS": {
-         "Fn::Join": [
-          "",
-          [
-           "arn:",
-           {
-            "Ref": "AWS::Partition"
-           },
-           ":iam::",
-           {
-            "Ref": "AWS::AccountId"
-           },
-           ":root"
-          ]
-         ]
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["CskSourceBucket7D65FE4B", "Arn"]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["CskSourceBucket7D65FE4B", "Arn"]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
         }
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Source/S3Source/CodePipelineActionRole/Resource"
-   }
-  },
-  "PipelineSourceS3SourceCodePipelineActionRoleDefaultPolicy352A3912": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": [
-        "s3:GetBucket*",
-        "s3:GetObject*",
-        "s3:List*"
-       ],
-       "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "CskSourceBucket7D65FE4B",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "CskSourceBucket7D65FE4B",
-             "Arn"
-            ]
-           },
-           "/csk-cdk-app.zip"
-          ]
-         ]
-        }
-       ]
       },
-      {
-       "Action": [
-        "s3:Abort*",
-        "s3:DeleteObject*",
-        "s3:PutObject",
-        "s3:PutObjectLegalHold",
-        "s3:PutObjectRetention",
-        "s3:PutObjectTagging",
-        "s3:PutObjectVersionTagging"
-       ],
-       "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "PipelineArtifactsBucket22248F97",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "PipelineArtifactsBucket22248F97",
-             "Arn"
-            ]
-           },
-           "/*"
-          ]
-         ]
-        }
-       ]
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CskSourceBucket/Policy/Resource"
       }
-     ],
-     "Version": "2012-10-17"
     },
-    "PolicyName": "PipelineSourceS3SourceCodePipelineActionRoleDefaultPolicy352A3912",
-    "Roles": [
-     {
-      "Ref": "PipelineSourceS3SourceCodePipelineActionRole8DE11A40"
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Source/S3Source/CodePipelineActionRole/DefaultPolicy/Resource"
-   }
-  },
-  "PipelineBuildCodePipelineActionRoleD77A08E6": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "AWS": {
-         "Fn::Join": [
-          "",
-          [
-           "arn:",
-           {
-            "Ref": "AWS::Partition"
-           },
-           ":iam::",
-           {
-            "Ref": "AWS::AccountId"
-           },
-           ":root"
-          ]
-         ]
-        }
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Build/Build/CodePipelineActionRole/Resource"
-   }
-  },
-  "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": [
-        "codebuild:BatchGetBuilds",
-        "codebuild:StartBuild",
-        "codebuild:StopBuild"
-       ],
-       "Effect": "Allow",
-       "Resource": {
-        "Fn::GetAtt": [
-         "BuildProject097C5DB7",
-         "Arn"
+    "CodebuildServiceRole0B2ADD6D": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/IAMFullAccess"
+              ]
+            ]
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/PowerUserAccess"
+              ]
+            ]
+          }
         ]
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "PolicyName": "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8",
-    "Roles": [
-     {
-      "Ref": "PipelineBuildCodePipelineActionRoleD77A08E6"
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/Pipeline/Build/Build/CodePipelineActionRole/DefaultPolicy/Resource"
-   }
-  },
-  "CskSourceBucket7D65FE4B": {
-   "Type": "AWS::S3::Bucket",
-   "Properties": {
-    "BucketEncryption": {
-     "ServerSideEncryptionConfiguration": [
-      {
-       "ServerSideEncryptionByDefault": {
-        "SSEAlgorithm": "AES256"
-       }
-      }
-     ]
-    },
-    "PublicAccessBlockConfiguration": {
-     "BlockPublicAcls": true,
-     "BlockPublicPolicy": true,
-     "IgnorePublicAcls": true,
-     "RestrictPublicBuckets": true
-    },
-    "VersioningConfiguration": {
-     "Status": "Enabled"
-    }
-   },
-   "UpdateReplacePolicy": "Retain",
-   "DeletionPolicy": "RetainExceptOnCreate",
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CskSourceBucket/Resource"
-   }
-  },
-  "CskSourceBucketPolicy512111C6": {
-   "Type": "AWS::S3::BucketPolicy",
-   "Properties": {
-    "Bucket": {
-     "Ref": "CskSourceBucket7D65FE4B"
-    },
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": "s3:*",
-       "Condition": {
-        "Bool": {
-         "aws:SecureTransport": "false"
-        }
-       },
-       "Effect": "Deny",
-       "Principal": {
-        "AWS": "*"
-       },
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "CskSourceBucket7D65FE4B",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "CskSourceBucket7D65FE4B",
-             "Arn"
-            ]
-           },
-           "/*"
-          ]
-         ]
-        }
-       ]
-      }
-     ],
-     "Version": "2012-10-17"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CskSourceBucket/Policy/Resource"
-   }
-  },
-  "CodebuildServiceRole0B2ADD6D": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "Service": "codebuild.amazonaws.com"
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "ManagedPolicyArns": [
-     {
-      "Fn::Join": [
-       "",
-       [
-        "arn:",
-        {
-         "Ref": "AWS::Partition"
-        },
-        ":iam::aws:policy/IAMFullAccess"
-       ]
-      ]
-     },
-     {
-      "Fn::Join": [
-       "",
-       [
-        "arn:",
-        {
-         "Ref": "AWS::Partition"
-        },
-        ":iam::aws:policy/PowerUserAccess"
-       ]
-      ]
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CodebuildServiceRole/Resource"
-   }
-  },
-  "CodebuildServiceRoleDefaultPolicy7A54D101": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": [
-        "s3:Abort*",
-        "s3:DeleteObject*",
-        "s3:GetBucket*",
-        "s3:GetObject*",
-        "s3:List*",
-        "s3:PutObject",
-        "s3:PutObjectLegalHold",
-        "s3:PutObjectRetention",
-        "s3:PutObjectTagging",
-        "s3:PutObjectVersionTagging"
-       ],
-       "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::GetAtt": [
-          "CskSourceBucket7D65FE4B",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::GetAtt": [
-          "PipelineArtifactsBucket22248F97",
-          "Arn"
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "CskSourceBucket7D65FE4B",
-             "Arn"
-            ]
-           },
-           "/*"
-          ]
-         ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           {
-            "Fn::GetAtt": [
-             "PipelineArtifactsBucket22248F97",
-             "Arn"
-            ]
-           },
-           "/*"
-          ]
-         ]
-        }
-       ]
       },
-      {
-       "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-       ],
-       "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::Join": [
-          "",
-          [
-           "arn:",
-           {
-            "Ref": "AWS::Partition"
-           },
-           ":logs:",
-           {
-            "Ref": "AWS::Region"
-           },
-           ":",
-           {
-            "Ref": "AWS::AccountId"
-           },
-           ":log-group:/aws/codebuild/",
-           {
-            "Ref": "BuildProject097C5DB7"
-           },
-           ":*"
-          ]
-         ]
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CodebuildServiceRole/Resource"
+      }
+    },
+    "CodebuildServiceRoleDefaultPolicy7A54D101": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:Abort*",
+                "s3:DeleteObject*",
+                "s3:GetBucket*",
+                "s3:GetObject*",
+                "s3:List*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": ["CskSourceBucket7D65FE4B", "Arn"]
+                },
+                {
+                  "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["CskSourceBucket7D65FE4B", "Arn"]
+                      },
+                      "/*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": ["PipelineArtifactsBucket22248F97", "Arn"]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":logs:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":log-group:/aws/codebuild/",
+                      {
+                        "Ref": "BuildProject097C5DB7"
+                      },
+                      ":*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":logs:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":log-group:/aws/codebuild/",
+                      {
+                        "Ref": "BuildProject097C5DB7"
+                      }
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "codebuild:BatchPutCodeCoverages",
+                "codebuild:BatchPutTestCases",
+                "codebuild:CreateReport",
+                "codebuild:CreateReportGroup",
+                "codebuild:UpdateReport"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":codebuild:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":report-group/",
+                    {
+                      "Ref": "BuildProject097C5DB7"
+                    },
+                    "-*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
         },
-        {
-         "Fn::Join": [
-          "",
-          [
-           "arn:",
-           {
-            "Ref": "AWS::Partition"
-           },
-           ":logs:",
-           {
-            "Ref": "AWS::Region"
-           },
-           ":",
-           {
-            "Ref": "AWS::AccountId"
-           },
-           ":log-group:/aws/codebuild/",
-           {
-            "Ref": "BuildProject097C5DB7"
-           }
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "Action": [
-        "codebuild:BatchPutCodeCoverages",
-        "codebuild:BatchPutTestCases",
-        "codebuild:CreateReport",
-        "codebuild:CreateReportGroup",
-        "codebuild:UpdateReport"
-       ],
-       "Effect": "Allow",
-       "Resource": {
-        "Fn::Join": [
-         "",
-         [
-          "arn:",
+        "PolicyName": "CodebuildServiceRoleDefaultPolicy7A54D101",
+        "Roles": [
           {
-           "Ref": "AWS::Partition"
-          },
-          ":codebuild:",
-          {
-           "Ref": "AWS::Region"
-          },
-          ":",
-          {
-           "Ref": "AWS::AccountId"
-          },
-          ":report-group/",
-          {
-           "Ref": "BuildProject097C5DB7"
-          },
-          "-*"
-         ]
+            "Ref": "CodebuildServiceRole0B2ADD6D"
+          }
         ]
-       }
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CodebuildServiceRole/DefaultPolicy/Resource"
       }
-     ],
-     "Version": "2012-10-17"
     },
-    "PolicyName": "CodebuildServiceRoleDefaultPolicy7A54D101",
-    "Roles": [
-     {
-      "Ref": "CodebuildServiceRole0B2ADD6D"
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CodebuildServiceRole/DefaultPolicy/Resource"
-   }
-  },
-  "BuildProject097C5DB7": {
-   "Type": "AWS::CodeBuild::Project",
-   "Properties": {
-    "Artifacts": {
-     "Type": "CODEPIPELINE"
-    },
-    "Cache": {
-     "Location": {
-      "Fn::Join": [
-       "/",
-       [
-        {
-         "Ref": "CskSourceBucket7D65FE4B"
+    "BuildProject097C5DB7": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
         },
-        "buildcache"
-       ]
+        "Cache": {
+          "Location": {
+            "Fn::Join": [
+              "/",
+              [
+                {
+                  "Ref": "CskSourceBucket7D65FE4B"
+                },
+                "buildcache"
+              ]
+            ]
+          },
+          "Type": "S3"
+        },
+        "EncryptionKey": "alias/aws/s3",
+        "Environment": {
+          "ComputeType": "BUILD_GENERAL1_LARGE",
+          "Image": "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
+          "ImagePullCredentialsType": "CODEBUILD",
+          "PrivilegedMode": true,
+          "Type": "LINUX_CONTAINER"
+        },
+        "ServiceRole": {
+          "Fn::GetAtt": ["CodebuildServiceRole0B2ADD6D", "Arn"]
+        },
+        "Source": {
+          "BuildSpec": "buildspec.yml",
+          "Type": "CODEPIPELINE"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/BuildProject/Resource"
+      }
+    },
+    "CDKMetadata": {
+      "Type": "AWS::CDK::Metadata",
+      "Properties": {
+        "Analytics": "v2:deflate64:H4sIAAAAAAAA/02NUQ6CMBBEz8J/WQENB5ADSPAABtqaLJQuoa3ENL27oUDwa97OTmYKyMsSsqRdTMrFkCrswD9tywfWLublOQk54SQVagm+3olVb31wYOYK/u74IO3q77RJTQr597S3OzBsR/ANqdgU9UwemXW6c6jEuVvP1EseZ3YMgTXSkJt5rHo4O7n4/3cr0gItkg5Mk5DQm8unyCC/QZb0BjGdnbY4Smg2/QGq4A8lFQEAAA=="
+      },
+      "Metadata": {
+        "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CDKMetadata/Default"
+      },
+      "Condition": "CDKMetadataAvailable"
+    }
+  },
+  "Outputs": {
+    "ExportCskSourceBucketName": {
+      "Value": {
+        "Ref": "CskSourceBucket7D65FE4B"
+      },
+      "Export": {
+        "Name": "CskSourceBucketName"
+      }
+    },
+    "ExportCskPipelineName": {
+      "Value": {
+        "Ref": "PipelineC660917D"
+      },
+      "Export": {
+        "Name": "CskPipelineName"
+      }
+    }
+  },
+  "Conditions": {
+    "CDKMetadataAvailable": {
+      "Fn::Or": [
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "af-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-3"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-south-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-3"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-4"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ca-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ca-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-northwest-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-central-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-south-2"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-3"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "il-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "me-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "me-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "sa-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-1"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            "us-west-2"
+          ]
+        }
       ]
-     },
-     "Type": "S3"
-    },
-    "EncryptionKey": "alias/aws/s3",
-    "Environment": {
-     "ComputeType": "BUILD_GENERAL1_LARGE",
-     "Image": "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
-     "ImagePullCredentialsType": "CODEBUILD",
-     "PrivilegedMode": true,
-     "Type": "LINUX_CONTAINER"
-    },
-    "ServiceRole": {
-     "Fn::GetAtt": [
-      "CodebuildServiceRole0B2ADD6D",
-      "Arn"
-     ]
-    },
-    "Source": {
-     "BuildSpec": "buildspec.yml",
-     "Type": "CODEPIPELINE"
     }
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/BuildProject/Resource"
-   }
-  },
-  "CDKMetadata": {
-   "Type": "AWS::CDK::Metadata",
-   "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02NUQ6CMBBEz8J/WQENB5ADSPAABtqaLJQuoa3ENL27oUDwa97OTmYKyMsSsqRdTMrFkCrswD9tywfWLublOQk54SQVagm+3olVb31wYOYK/u74IO3q77RJTQr597S3OzBsR/ANqdgU9UwemXW6c6jEuVvP1EseZ3YMgTXSkJt5rHo4O7n4/3cr0gItkg5Mk5DQm8unyCC/QZb0BjGdnbY4Smg2/QGq4A8lFQEAAA=="
-   },
-   "Metadata": {
-    "aws:cdk:path": "csk-cdk-app-delivery-pipeline/CDKMetadata/Default"
-   },
-   "Condition": "CDKMetadataAvailable"
   }
- },
- "Outputs": {
-  "ExportCskSourceBucketName": {
-   "Value": {
-    "Ref": "CskSourceBucket7D65FE4B"
-   },
-   "Export": {
-    "Name": "CskSourceBucketName"
-   }
-  },
-  "ExportCskPipelineName": {
-   "Value": {
-    "Ref": "PipelineC660917D"
-   },
-   "Export": {
-    "Name": "CskPipelineName"
-   }
-  }
- },
- "Conditions": {
-  "CDKMetadataAvailable": {
-   "Fn::Or": [
-    {
-     "Fn::Or": [
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "af-south-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-east-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-northeast-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-northeast-2"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-northeast-3"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-south-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-south-2"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-southeast-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-southeast-2"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-southeast-3"
-       ]
-      }
-     ]
-    },
-    {
-     "Fn::Or": [
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ap-southeast-4"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ca-central-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "ca-west-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "cn-north-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "cn-northwest-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-central-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-central-2"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-north-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-south-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-south-2"
-       ]
-      }
-     ]
-    },
-    {
-     "Fn::Or": [
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-west-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-west-2"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "eu-west-3"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "il-central-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "me-central-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "me-south-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "sa-east-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "us-east-1"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "us-east-2"
-       ]
-      },
-      {
-       "Fn::Equals": [
-        {
-         "Ref": "AWS::Region"
-        },
-        "us-west-1"
-       ]
-      }
-     ]
-    },
-    {
-     "Fn::Equals": [
-      {
-       "Ref": "AWS::Region"
-      },
-      "us-west-2"
-     ]
-    }
-   ]
-  }
- }
 }

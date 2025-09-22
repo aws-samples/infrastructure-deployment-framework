@@ -27,6 +27,7 @@ $scripts = @(
     "src/scripts/deployments.js",
     "src/scripts/get-amis-and-instance-types.js",
     "src/scripts/get-db-engines-and-instance-types.js",
+    "src/scripts/get-bedrock-models.js",
     "src/scripts/sdk-commands.js",
     "src/scripts/renderer.js"
 )

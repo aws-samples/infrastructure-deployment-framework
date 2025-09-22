@@ -1,25 +1,45 @@
 //get the values the user has set in the UI
-let excludedAttributes = ["id", "name", "value", "type", "value", "style", "class", "min", "max", "required", "pattern", "onchange"];
+let excludedAttributes = ["id", "name", "value", "type", "value", "multiple", "style", "class", "min", "max", "required", "pattern", "onchange"];
 function getFormInputs(kitId) {
   let inputs = [];
+  let paramObjects = templateParameterObjects[kitId];
   let params = templateParameters.hasOwnProperty(kitId) ? templateParameters[kitId] : [];
   let extraParams = {};
+
   for (let i = 0; i < params.length; i++) {
+    if (paramObjects.hasOwnProperty(params[i]) && paramObjects[params[i]].hasOwnProperty("Alias")) {
+      continue;
+    }
+    let askingForList = false;
+    if (paramObjects[params[i]].hasOwnProperty("Type") && paramObjects[params[i]]["Type"].match("^List<")) {
+      askingForList = true;
+    }
     let elemId = `${kitId}|${params[i]}`;
     let param = document.getElementById(elemId);
-    let parameterValue = param.value;
+    // amazonq-ignore-next-line
+    console.log(param);
+    let parameterValue = askingForList ? [param.value] : param.value;
     if (param.tagName.match(/^textarea$/i)) {
+      // amazonq-ignore-next-line
       console.log(parameterValue);
+      // amazonq-ignore-next-line
       console.log(parameterValue.split("\n"));
       parameterValue = bytesToBase64(new TextEncoder().encode(parameterValue));
     }
     if (param.tagName.match(/^input$/i) && param.getAttribute("type") === "checkbox") {
-      parameterValue = param.checked;
+      parameterValue = askingForList ? [param.checked] : param.checked;
     }
     if (param.tagName.match(/^select$/i)) {
-      if (param.selectedIndex > -1) {
-        //only look if there is a selected option
-        const selectedOption = param.options[param.selectedIndex];
+      // if (param.selectedIndex > -1) {
+      //only look if there is a selected option or options
+      const selectedOptions = Array.from(param.options).filter((option) => option.selected);
+
+      parameterValue = [];
+
+      selectedOptions.forEach((selectedOption) => {
+        // amazonq-ignore-next-line
+        console.log(selectedOption.value); // Log the value of each selected option
+        parameterValue.push(selectedOption.value);
         if (selectedOption.hasAttributes()) {
           for (const attr of selectedOption.attributes) {
             if (excludedAttributes.indexOf(attr.name) < 0) {
@@ -27,6 +47,11 @@ function getFormInputs(kitId) {
             }
           }
         }
+      });
+      if (param.hasAttributes() && param.attributes.hasOwnProperty("multiple")) {
+        parameterValue = parameterValue ? parameterValue : [];
+      } else {
+        parameterValue = askingForList ? parameterValue : parameterValue[0];
       }
     }
     if (param.hasAttributes()) {
@@ -44,6 +69,24 @@ function getFormInputs(kitId) {
     };
     inputs.push(parameterObject);
   }
+  // convert any aliases into parameters and delete the synthetic parameter
+  for (let i = 0; i < params.length; i++) {
+    if (paramObjects.hasOwnProperty(params[i]) && paramObjects[params[i]].hasOwnProperty("Alias")) {
+      for (let key in extraParams) {
+        if (key === paramObjects[params[i]].Alias) {
+          let parameterObject = {
+            ParameterKey: params[i],
+            ParameterValue: extraParams[paramObjects[params[i]].Alias],
+            ResolvedValue: extraParams[paramObjects[params[i]].Alias],
+            UsePreviousValue: false,
+          };
+          inputs.push(parameterObject);
+          delete extraParams[paramObjects[params[i]].Alias];
+        }
+      }
+    }
+  }
+  // pass any remaining synthetic parameters
   for (let key in extraParams) {
     let parameterObject = {
       ParameterKey: key,
@@ -53,14 +96,9 @@ function getFormInputs(kitId) {
     };
     inputs.push(parameterObject);
   }
+
   return inputs;
 }
-
-function cancelInstall(kitId) {
-  unlockInstallButton(kitId);
-  closeConfirmationModal();
-}
-
 //deploy an CFN template-based kit
 async function deployCfnTemplate(kitId, templateIndex = 0, updateConfirmed = false) {
   if (!window.loggedIn) {
@@ -153,6 +191,7 @@ async function deployCfnTemplate(kitId, templateIndex = 0, updateConfirmed = fal
         }
       } else if (i > 0 && i > templateIndex) {
         let previousStackName = stacksWithParams[i - 1][0]; //window.deriveCfnStackName(templates[i - 1], thisStacksParams);
+        // amazonq-ignore-next-line
         console.log(`adding a listener for completion of ${previousStackName} to deploy ${stackName}`);
         addEventListener(TASK_EVENTS.DEPLOYMENT_COMPLETE, (event) => {
           if (event.detail === previousStackName) {
@@ -179,20 +218,20 @@ function stacksToBeUpdated(stackNameArray) {
 }
 
 //deploy a cdk-based kit using codepipeline
-async function deployCdkApp(kitId, updateConfirmed = false) {
+async function deployApp(kitId, updateConfirmed = false) {
   if (!window.loggedIn) {
     return;
   }
   let kitObject = kitMetadata[kitId];
   let inputs = getFormInputs(kitId);
-  let derivedStacknames = await window.deriveCdkStackNames(kitObject, inputs);
+  let derivedStacknames = await window.deriveAppStackNames(kitObject, inputs);
   let stacksBeingUpdated = stacksToBeUpdated(derivedStacknames);
   if (kitMetadata[kitId].AllowUpdates && stacksBeingUpdated.length > 0 && !updateConfirmed) {
     showConfirmationModal(
       true,
       "Are you sure?",
       `You are going to update ${stacksBeingUpdated.join(" and ")} - click Confirm to continue or Cancel.`,
-      deployCdkApp,
+      deployApp,
       cancelInstall,
       [kitId, true]
     );
@@ -203,27 +242,28 @@ async function deployCdkApp(kitId, updateConfirmed = false) {
       `If you proceed we will attempt to update the stack${stacksBeingUpdated.length > 1 ? "s" : ""} <b>${stacksBeingUpdated.join(
         " and "
       )}</b>. This may fail. <p>Click Confirm to continue or Cancel.</p>`,
-      deployCdkApp,
+      deployApp,
       cancelInstall,
       [kitId, true]
     );
   } else {
-    // all CDK kits will be deployed the same way, via upload to s3 source bucket
+    // all non-CFN kits will be deployed the same way, via upload to s3 source bucket
     const sourceBucket = getValueInNamespace(`${account}-${region}`, "SourceBucket");
     if (sourceBucket === "") {
-      alert("No source bucket available");
+      console.log("No source bucket available");
+      return;
     }
     startMonitoring();
     phoneHome({
       csk_id: window.resellerConfig.csk_id,
       kit_id: kitId,
-      action: "deploy-cdk-kit",
+      action: `deploy-${kitMetadata[kitId]["AppType"].toLowerCase()}-kit`,
       partner_name: window.resellerConfig.AWSDistributorName,
       country_code: window.resellerConfig.CountryCode,
       starter_kit: kitObject.Manifest,
       details: inputs,
     });
-    window.deployCdkViaSourceBucket(kitId, kitObject, inputs, region, account, sourceBucket, deployResponseHandler, updateConfirmed);
+    window.deployAppViaSourceBucket(kitId, kitObject, inputs, region, account, sourceBucket, deployResponseHandler, updateConfirmed);
   }
 }
 
@@ -233,6 +273,7 @@ function destroyStack(kitId) {
   }
   window.listStacks((err, stacks) => {
     if (err) {
+      // amazonq-ignore-next-line
       console.error(err);
     } else {
       console.log(stacks);

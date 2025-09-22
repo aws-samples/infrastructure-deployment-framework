@@ -32,6 +32,8 @@ const { SSMClient, GetParametersByPathCommand } = require("@aws-sdk/client-ssm")
 const { STSClient, GetCallerIdentityCommand } = require("@aws-sdk/client-sts");
 const { RDSClient, DescribeDBEngineVersionsCommand, DescribeOrderableDBInstanceOptionsCommand } = require("@aws-sdk/client-rds");
 const { Route53Client, ListHostedZonesCommand } = require("@aws-sdk/client-route-53");
+const { BedrockClient, ListFoundationModelsCommand } = require("@aws-sdk/client-bedrock");
+
 const { rootPath } = require("electron-root-path");
 const path = require("path");
 const fs = require("fs");
@@ -246,6 +248,25 @@ contextBridge.exposeInMainWorld("getRegions", (cb) => getRegions(cb));
 /*
  * These functions fetch info from the account that we use in the UI
  */
+
+async function getBedrockModels(callback) {
+  let bedrock = new BedrockClient({
+    region: REGION,
+    credentials: fromEnv(),
+  });
+  const input = {};
+  const command = new ListFoundationModelsCommand(input);
+  await bedrock.send(command).then(
+    (data) => {
+      callback(null, data);
+    },
+    (err) => {
+      callback(err, null);
+    }
+  );
+}
+contextBridge.exposeInMainWorld("getBedrockModels", (cb) => getBedrockModels(cb));
+
 async function getVpcs(callback) {
   const ec2 = new EC2Client({
     region: REGION,
@@ -665,33 +686,43 @@ contextBridge.exposeInMainWorld("getUserdataTemplate", (os, arch) => getUserdata
 async function getFileFromFileHost(partialUri, type = "json") {
   let url = `https://${process.env.FILE_HOST}/${partialUri}`;
   console.log(`getting ${url}`);
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "x-access-control": JSON.parse(localStorage.getItem("kitConfig"))["KitHubCode"],
-    },
-  });
-  let data = await response.text();
-  if (type === "json") {
-    try {
-      // this is not a problem as we only get data from trusted hosts
-      // amazonq-ignore-next-line
-      const dataobj = JSON.parse(data);
-      return dataobj;
-    } catch (e) {
-      console.log(e);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-access-control": JSON.parse(localStorage.getItem("kitConfig"))["KitHubCode"],
+      },
+    });
+    if (!response.ok) {
+      console.log(`Response status: ${response.status}`);
       return {};
+    } else {
+      let data = await response.text();
+      if (type === "json") {
+        try {
+          // this is not a problem as we only get data from trusted hosts
+          // amazonq-ignore-next-line
+          const dataobj = JSON.parse(data);
+          return dataobj;
+        } catch (e) {
+          console.log(e);
+          return {};
+        }
+      } else if (type === "yaml") {
+        try {
+          const dataobj = yaml.load(data);
+          return dataobj;
+        } catch (e) {
+          console.log(e);
+          return {};
+        }
+      }
+      return data;
     }
-  } else if (type === "yaml") {
-    try {
-      const dataobj = yaml.load(data);
-      return dataobj;
-    } catch (e) {
-      console.log(e);
-      return {};
-    }
+  } catch (e) {
+    console.log(e);
+    return {};
   }
-  return data;
 }
 contextBridge.exposeInMainWorld("getFileFromFileHost", (p, t) => getFileFromFileHost(p, t));
 
@@ -704,9 +735,49 @@ async function getFullCatalogue(callback) {
   const catDescs = await getFileFromFileHost("kits/category-descriptions.json");
   const cfnKits = await getFileFromFileHost("kits/cfn-templates/catalogue.json");
   const cdkKits = await getFileFromFileHost("kits/cdk-apps/catalogue.json");
-  console.log(cdkKits);
-  const allKits = cfnKits["Catalogue"].concat(cdkKits["Catalogue"]);
-
+  let samKits = { Catalogue: [] };
+  try {
+    samKitsFromFile = await getFileFromFileHost("kits/sam-apps/catalogue.json");
+    console.log(samKitsFromFile);
+    if (samKitsFromFile.Catalogue.length > 0) {
+      samKits = samKitsFromFile;
+      for (let i = 0; i < samKits["Catalogue"].length; i++) {
+        for (let j = 0; j < samKits["Catalogue"][i].Kits.length; j++) {
+          samKits["Catalogue"][i].Kits[j]["AppType"] = "SAM";
+        }
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  } // no sam in pre-re
+  let codebuildKits = { Catalogue: [] };
+  try {
+    codebuildKitsFromFile = await getFileFromFileHost("kits/codebuild-apps/catalogue.json");
+    console.log(codebuildKitsFromFile);
+    if (codebuildKitsFromFile.Catalogue.length > 0) {
+      codebuildKits = codebuildKitsFromFile;
+      for (let i = 0; i < codebuildKits["Catalogue"].length; i++) {
+        for (let j = 0; j < codebuildKits["Catalogue"][i].Kits.length; j++) {
+          codebuildKits["Catalogue"][i].Kits[j]["AppType"] = "Codebuild";
+        }
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  } // no sam in pre-re
+  for (let i = 0; i < cdkKits["Catalogue"].length; i++) {
+    for (let j = 0; j < cdkKits["Catalogue"][i].Kits.length; j++) {
+      cdkKits["Catalogue"][i].Kits[j]["AppType"] = "CDK";
+    }
+  }
+  let allKits = cfnKits["Catalogue"].concat(cdkKits["Catalogue"]);
+  if (samKits.Catalogue.length > 0) {
+    allKits = allKits.concat(samKits["Catalogue"]);
+  }
+  if (codebuildKits.Catalogue.length > 0) {
+    allKits = allKits.concat(codebuildKits["Catalogue"]);
+  }
+  console.log(allKits);
   for (let i = 0; i < allKits.length; i++) {
     let tlc = allKits[i]["TopLevelCategory"];
     let cat = allKits[i]["Category"];
@@ -754,8 +825,8 @@ function deriveCfnStackName(template, inputs, stackNamingParam) {
 }
 contextBridge.exposeInMainWorld("deriveCfnStackName", (template, inputs, stackNamingParam) => deriveCfnStackName(template, inputs, stackNamingParam));
 
-async function deriveCdkStackNames(kitObject, inputs) {
-  const manifest = await getFileFromFileHost(`kits/cdk-apps/${kitObject.Manifest}`);
+async function deriveAppStackNames(kitObject, inputs) {
+  const manifest = await getFileFromFileHost(`kits/${kitObject["AppType"].toLowerCase()}-apps/${kitObject.Manifest}`);
   let transformedStackDefs = [];
   for (let i = 0; i < manifest.Stacks.length; i++) {
     transformedStackDefs[i] = manifest.Stacks[i];
@@ -774,7 +845,7 @@ async function deriveCdkStackNames(kitObject, inputs) {
   }
   return transformedStackDefs;
 }
-contextBridge.exposeInMainWorld("deriveCdkStackNames", (manifest, inputs) => deriveCdkStackNames(manifest, inputs));
+contextBridge.exposeInMainWorld("deriveAppStackNames", (kitObject, inputs) => deriveAppStackNames(kitObject, inputs));
 
 function recordKitConfig(kitId, inputs, stackName, s3, bucketName) {
   const now = new Date().getTime();
@@ -988,18 +1059,19 @@ function removePathTraversals(path) {
 /*
  * Deploy CDK app
  */
-async function deployCdkViaSourceBucket(kitId, kitObject, inputs, region, account, bucketName, callback, updateRequested = false) {
+async function deployAppViaSourceBucket(kitId, kitObject, inputs, region, account, bucketName, callback, updateRequested = false) {
   manifestFilename = removePathTraversals(kitObject.Manifest);
-  const manifest = await getFileFromFileHost(`kits/cdk-apps/${manifestFilename}`);
+  const appType = kitObject["AppType"].toLowerCase();
+  const manifest = await getFileFromFileHost(`kits/${appType}-apps/${manifestFilename}`);
   const appFolder = manifest.hasOwnProperty("KitDirectoryOverride") ? manifest.KitDirectoryOverride : manifestFilename.replace(/.json$/, "");
   //download the relevant CDK files
-  fs.writeFileSync(path.join(rootPath, "downloaded", "kits", "cdk-apps", manifestFilename), JSON.stringify(manifest));
+  fs.writeFileSync(path.join(rootPath, "downloaded", "kits", `${appType}-apps`, manifestFilename), JSON.stringify(manifest));
   for (let i = 0; i < manifest.FileList.length; i++) {
     let sanitizedFilepath = removePathTraversals(manifest.FileList[i]);
-    let file = await getFileFromFileHost(`kits/cdk-apps/${sanitizedFilepath}`, "filedata");
+    let file = await getFileFromFileHost(`kits/${appType}-apps/${sanitizedFilepath}`, "filedata");
     let pathToFile = sanitizedFilepath.split("/");
     let fileName = pathToFile.pop();
-    let dirToCreate = [rootPath, "downloaded", "kits", "cdk-apps"];
+    let dirToCreate = [rootPath, "downloaded", "kits", `${appType}-apps`];
     for (let j = 0; j < pathToFile.length; j++) {
       dirToCreate.push(pathToFile[j]);
       let dir = path.join(...dirToCreate);
@@ -1008,36 +1080,21 @@ async function deployCdkViaSourceBucket(kitId, kitObject, inputs, region, accoun
         fs.mkdirSync(dirToCreate.join("/"));
       }
     }
-    fs.writeFileSync(path.join(rootPath, "downloaded", "kits", "cdk-apps", ...pathToFile, fileName), file);
+    fs.writeFileSync(path.join(rootPath, "downloaded", "kits", `${appType}-apps`, ...pathToFile, fileName), file);
   }
+  let derivedStacknames = await deriveAppStackNames(kitObject, inputs);
+  let primaryStack = derivedStacknames[0].name;
   //prepare the CDK files and zip the dir
-  let usedInputs = await prepCdkAppDirectory(kitId, manifest, appFolder, inputs, region, account);
-  const zipPath = path.join(rootPath, "downloaded", "kits", "cdk-apps", `${appFolder}.zip`);
+  let usedInputs = await prepAppDirectory(appType, kitId, manifest, appFolder, inputs, region, account, bucketName, primaryStack);
+  const zipPath = path.join(rootPath, "downloaded", "kits", `${appType}-apps`, `${appFolder}.zip`);
   const s3 = new S3Client({
     region: REGION,
     credentials: fromEnv(),
   });
 
-  // The file always has the same name because this is how the cloudtrail event triggers the pipeline
-  // const s3params = {
-  //   Bucket: bucketName,
-  //   Key: "csk-cdk-app.zip",
-  //   Body: fs.createReadStream(zipPath),
-  // };
-  let derivedStacknames = await deriveCdkStackNames(kitObject, inputs);
-  let primaryStack = derivedStacknames[0].name;
   for (let i = 0; i < derivedStacknames.length; i++) {
     let modifiedStackName = derivedStacknames[i].name;
-    // for (let j = 0; j < inputs.length; j++) {
-    //   if (manifest.Stacks[i].name.indexOf(`{${inputs[j].ParameterKey}}`) > -1) {
-    //     modifiedStackName = modifiedStackName.replace(
-    //       `{${inputs[j].ParameterKey}}`,
-    //       inputs[j].ParameterValue.replace(/[^a-zA-Z0-9\-]/g, "")
-    //         .toLowerCase()
-    //         .substring(0, 100)
-    //     );
-    //   }
-    // }
+
     localStorage.setItem(`${account}-${region}-${modifiedStackName}`, JSON.stringify(usedInputs));
     if (i === 0) {
       primaryStack = modifiedStackName;
@@ -1065,60 +1122,23 @@ async function deployCdkViaSourceBucket(kitId, kitObject, inputs, region, accoun
   await cloudFormation.send(command).then(
     (data) => {
       if (kitObject.AllowUpdates === true && updateRequested) {
-        uploadCdkApp(s3, bucketName, zipPath, primaryStack, callback, updateRequested);
+        uploadApp(s3, bucketName, zipPath, primaryStack, callback, updateRequested);
       } else {
         callback(new Error(`Stack [${primaryStack}] already exists.`), null, primaryStack);
       }
     },
     (err) => {
       if (err.message.match(/Stack with id (.*) does not exist/)) {
-        uploadCdkApp(s3, bucketName, zipPath, primaryStack, callback, updateRequested);
-        // Upload the file to S3
-        // new Upload({
-        //   client: s3,
-        //   params,
-        // })
-        //   .done()
-        //   .then((data) => {
-        //     console.log("File uploaded successfully. File location:", data.Location);
-        //     const pipelineName = localStorage.getItem(`${ACCOUNT}-${REGION}-PipelineName`);
-        //     if (pipelineName) {
-        //       // trigger the pipeline execution here and pass back the execution id
-        //       var params = {
-        //         name: pipelineName,
-        //       };
-        //       const codepipeline = new CodePipelineClient({
-        //         region: REGION,
-        //         credentials: fromEnv(),
-        //       });
-        //       const command = new StartPipelineExecutionCommand(params);
-        //       codepipeline.send(command).then(
-        //         (data) => {
-        //           console.log(data); // successful response
-        //           callback(null, data, primaryStack);
-        //         },
-        //         (err) => {
-        //           console.log(err, err.stack); // an error occurred
-        //           callback(err, null, primaryStack);
-        //         }
-        //       );
-        //     } else {
-        //       callback(null, data, primaryStack);
-        //     }
-        //   })
-        //   .then((err) => {
-        //     console.log("Error uploading file:", err);
-        //     callback(err, null, primaryStack);
-        //   });
+        uploadApp(s3, bucketName, zipPath, primaryStack, callback, updateRequested);
       }
     }
   );
 }
-contextBridge.exposeInMainWorld("deployCdkViaSourceBucket", (kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested) =>
-  deployCdkViaSourceBucket(kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested)
+contextBridge.exposeInMainWorld("deployAppViaSourceBucket", (kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested) =>
+  deployAppViaSourceBucket(kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested)
 );
 
-function uploadCdkApp(s3, bucketName, zipPath, primaryStack, callback, requestingUpdate = false) {
+function uploadApp(s3, bucketName, zipPath, primaryStack, callback, requestingUpdate = false) {
   const params = {
     Bucket: bucketName,
     Key: "csk-cdk-app.zip",
@@ -1163,13 +1183,13 @@ function uploadCdkApp(s3, bucketName, zipPath, primaryStack, callback, requestin
     });
 }
 
-async function prepCdkAppDirectory(kitId, manifest, appFolder, inputs, region, account) {
-  console.log(kitId, manifest, appFolder, inputs, region, account);
+async function prepAppDirectory(appType, kitId, manifest, appFolder, inputs, region, account, bucketName, primaryStack) {
+  console.log(appType, kitId, manifest, appFolder, inputs, region, account);
 
   const appConfig = JSON.parse(localStorage.getItem("kitConfig"));
   let usedInputs = [];
   appFolder = removePathTraversals(appFolder);
-  const appFolderPath = path.join(rootPath, "downloaded", "kits", "cdk-apps", appFolder);
+  const appFolderPath = path.join(rootPath, "downloaded", "kits", `${appType}-apps`, appFolder);
   if (fs.existsSync(appFolderPath)) {
     if (manifest.hasOwnProperty("ConfigFile")) {
       // populate the config file template with inputs and write the file that will be consumed by CDK
@@ -1182,18 +1202,60 @@ async function prepCdkAppDirectory(kitId, manifest, appFolder, inputs, region, a
         configJson["appKey"] = appConfig.csk_id;
         configJson["businessName"] = appConfig.BusinessName;
         for (let i = 0; i < inputs.length; i++) {
-          if (configJson.hasOwnProperty(inputs[i]["ParameterKey"])) {
+          // amazonq-ignore-next-line
+          if (inputs[i]["ParameterKey"].match(".").length > 0) {
+            // compound key
+            let nesting = inputs[i]["ParameterKey"].split(".");
+            if (nesting.length === 2) {
+              if (configJson.hasOwnProperty(nesting[0]) && configJson[nesting[0]].hasOwnProperty(nesting[1])) {
+                configJson[nesting[0]][nesting[1]] = inputs[i]["ParameterValue"];
+                usedInputs.push(inputs[i]);
+              }
+            } else if (nesting.length === 3) {
+              if (
+                configJson.hasOwnProperty(nesting[0]) &&
+                configJson[nesting[0]].hasOwnProperty(nesting[1]) &&
+                configJson[nesting[1]].hasOwnProperty(nesting[2])
+              ) {
+                configJson[nesting[0]][nesting[1]][nesting[2]] = inputs[i]["ParameterValue"];
+                usedInputs.push(inputs[i]);
+              }
+            }
+          } else if (configJson.hasOwnProperty(inputs[i]["ParameterKey"])) {
             configJson[inputs[i]["ParameterKey"]] = inputs[i]["ParameterValue"];
             usedInputs.push(inputs[i]);
           }
         }
-        fs.writeFileSync(path.join(appFolderPath, removePathTraversals(manifest.ConfigFile)), JSON.stringify(configJson));
+        let configFileData = JSON.stringify(configJson);
+        if (appType === "sam") {
+          let samConfig = [];
+          for (let key in configJson) {
+            samConfig.push(`${key}=${configJson[key]}`);
+          }
+          configFileData = JSON.stringify(samConfig);
+          let buildspec = null;
+          let bsfilename = "buildspec.yaml";
+          if (fs.existsSync(path.join(appFolderPath, "buildspec.yaml"))) {
+            buildspec = fs.readFileSync(path.join(appFolderPath, "buildspec.yaml"));
+          } else {
+            buildspec = fs.readFileSync(path.join(appFolderPath, "buildspec.yml"));
+            bsfilename = "buildspec.yml";
+          }
+          if (buildspec) {
+            buildspec = buildspec
+              .toString()
+              .replace(/S3_BUCKET_NAME/g, bucketName)
+              .replace(/UNIQUE_STACK_NAME/g, primaryStack);
+            fs.writeFileSync(path.join(appFolderPath, bsfilename), buildspec);
+          }
+        }
+        fs.writeFileSync(path.join(appFolderPath, removePathTraversals(manifest.ConfigFile)), configFileData);
       }
     } else {
       //console.log("either no config file specified or no inputs, or both");
     }
     //zip it good
-    await zipFolder(appFolderPath, path.join(rootPath, "downloaded", "kits", "cdk-apps", `${appFolder}.zip`));
+    await zipFolder(appFolderPath, path.join(rootPath, "downloaded", "kits", `${appType}-apps`, `${appFolder}.zip`));
   }
   return usedInputs;
 }

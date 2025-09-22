@@ -7,10 +7,17 @@ do
    ./node_modules/.bin/eslint $i
 done
 
-rm test/renderer.concat.js
-touch test/renderer.concat.js
+if ! rm test/renderer.concat.js; then
+    echo "Error: Failed to remove test/renderer.concat.js" >&2
+    exit 1
+fi
 
-scripts=("src/scripts/utilities.js" "src/scripts/task-queue.js" "src/scripts/stack-monitoring.js" "src/scripts/deployments.js" "src/scripts/get-amis-and-instance-types.js" "src/scripts/get-db-engines-and-instance-types.js" "src/scripts/sdk-commands.js" "src/scripts/renderer.js")
+if ! touch test/renderer.concat.js; then
+    echo "Error: Failed to create test/renderer.concat.js" >&2
+    exit 1
+fi
+
+scripts=("src/scripts/utilities.js" "src/scripts/task-queue.js" "src/scripts/stack-monitoring.js" "src/scripts/deployments.js" "src/scripts/get-amis-and-instance-types.js" "src/scripts/get-bedrock-models.js" "src/scripts/get-db-engines-and-instance-types.js" "src/scripts/sdk-commands.js" "src/scripts/renderer.js")
 for i in "${scripts[@]}"
 do
    echo "

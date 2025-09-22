@@ -310,7 +310,7 @@ async function handler(event) {
                 "__pycache__",
                 ".cdk.staging",
                 "*.swp",
-                "package-lock.json",
+                # "package-lock.json",
                 "__pycache__",
                 ".pytest_cache",
                 ".venv",

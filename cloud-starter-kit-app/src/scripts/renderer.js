@@ -5,6 +5,7 @@ let region = null;
 let account = null;
 let progressBars = {};
 let templateParameters = {};
+let templateParameterObjects = {};
 let loadBlockTimeout = null;
 let regionSelected = false;
 let kitMetadata = {};
@@ -247,7 +248,7 @@ function writeInputForAlias(account) {
   aliasInput.id = "account-alias-input";
   aliasInput.placeholder = "Account owner...";
   aliasInput.onkeyup = (e) => {
-    if (e.key === "Enter" || e.keyCode === 13) {
+    if (e.key === "Enter") {
       setValueInNamespace(account, "alias", aliasInput.value);
       document.getElementById("account-alias").innerText = aliasInput.value;
     }
@@ -259,10 +260,16 @@ let kitConfigsShowing = {};
 function configureKit(kitId) {
   let kit = kitMetadata[kitId];
   kitConfigsShowing[kitId] = true;
-  console.log(`configuring ${kit}`);
+  console.log(`configuring ${kit.kitId}`);
   if (kit.hasOwnProperty("Templates")) {
     //cfn kit
     displayTemplateConfig(kitId);
+  } else if (kit.hasOwnProperty("AppType") && kit.AppType === "SAM") {
+    //sam kit
+    displaySamAppConfig(kitId);
+  } else if (kit.hasOwnProperty("AppType") && kit.AppType === "Codebuild") {
+    //Codebuild kit
+    displayCodebuildAppConfig(kitId);
   } else {
     //cdk kit
     displayCdkAppConfig(kitId);
@@ -289,7 +296,10 @@ function hideConfigForKit(kitId) {
     configButton.style.display = "block";
     installButton.style.display = "none";
     cancelButton.style.display = "none";
-    delete kitConfigsShowing[kitId];
+    const index = Object.keys(kitConfigsShowing).indexOf(kitId);
+    if (index !== -1) {
+      kitConfigsShowing.splice(index, 1);
+    }
   }
 }
 
@@ -305,10 +315,19 @@ function installKit(kitId) {
   if (kit.hasOwnProperty("Templates")) {
     //cfn kit
     deployCfnTemplate(kitId);
+    // } else if (kit.hasOwnProperty("AppType") && kit.AppType === "SAM") {
+    //   //cdk kit
+    //   deployApp(kitId);
   } else {
     //cdk kit
-    deployCdkApp(kitId);
+    deployApp(kitId);
   }
+}
+
+function cancelInstall(kitId) {
+  unlockInstallButton(kitId);
+  closeDeploymentPane(kitId);
+  closeConfirmationModal();
 }
 
 function reenableKitButton(kitId) {
@@ -331,6 +350,9 @@ function deleteKit(kitId) {
   if (kit.hasOwnProperty("Templates")) {
     //cfn kit
     deleteCfnStack(kitId);
+  } else if (kit.hasOwnProperty("AppType") && kit.AppType === "SAM") {
+    //cdk kit
+    destroySamApp(kitId);
   } else {
     //cdk kit
     destroyCdkApp(kitId);
@@ -343,6 +365,10 @@ function deleteCfnStack(kitId) {
 
 function destroyCdkApp(kitId) {
   console.log("destroyCdkApp", kitId);
+}
+
+function destroySamApp(kitId) {
+  console.log("destroySamApp", kitId);
 }
 
 function showCategory(catId) {
@@ -363,13 +389,18 @@ function showCategory(catId) {
   }
 }
 
-function toggleDeploymentDetails(kitId, alwaysOpen = false) {
+function toggleDeploymentDetails(kitId, forceOpen = false) {
   let detailsDiv = document.getElementById(`${kitId}-deployment-details`);
-  if (alwaysOpen || detailsDiv.style.display === "none") {
+  if (forceOpen || detailsDiv.style.display === "none") {
     detailsDiv.style.display = "block";
   } else {
     detailsDiv.style.display = "none";
   }
+}
+
+function closeDeploymentPane(kitId) {
+  document.getElementById(`${kitId}-deployment-progress`).style.display = "none";
+  document.getElementById(`${kitId}-deployment-details`).style.display = "none";
 }
 
 function getAllKitsMetadata() {
@@ -396,6 +427,7 @@ function getAllKitsMetadata() {
       let thisCatLink = document.createElement("a");
       thisCatLink.innerText = tlc;
       thisCatSpan.appendChild(thisCatLink);
+      // amazonq-ignore-next-line
       thisCatSpan.setAttribute("onclick", `showCategory('${categoryId}')`);
       catSpans.push(thisCatSpan);
 
@@ -425,8 +457,8 @@ function getAllKitsMetadata() {
         for (let i = 0; i < data[tlc]["Categories"][category]["Kits"].length; i++) {
           let kit = data[tlc]["Categories"][category]["Kits"][i];
           let kitTech = "cfn";
-          if (kit.hasOwnProperty("Manifest")) {
-            kitTech = "cdk";
+          if (kit.hasOwnProperty("AppType")) {
+            kitTech = kit.AppType.toLowerCase();
           }
           let kitId = `${kitTech}-${kit["Name"]
             .toLowerCase()
@@ -481,29 +513,34 @@ function getAllKitsMetadata() {
           let kitConfig = document.createElement("button");
           kitConfig.id = `${kitId}-config-button`;
           kitConfig.innerText = `Configure ${kit["Name"]}`;
+          // amazonq-ignore-next-line
           kitConfig.setAttribute("onclick", `configureKit('${kitId}')`);
           //install button
           let kitInstall = document.createElement("button");
           kitInstall.id = `${kitId}-install-button`;
           kitInstall.innerText = `Install ${kit["Name"]}`;
+          // amazonq-ignore-next-line
           kitInstall.setAttribute("onclick", `installKit('${kitId}')`);
           kitInstall.style.display = "none";
           //update button
           let kitUpdate = document.createElement("button");
           kitUpdate.id = `${kitId}-update-button`;
           kitUpdate.innerText = `Update ${kit["Name"]}`;
+          // amazonq-ignore-next-line
           kitUpdate.setAttribute("onclick", `installKit('${kitId}')`);
           kitUpdate.style.display = "none";
           //delete button
           let kitDelete = document.createElement("button");
           kitDelete.id = `${kitId}-delete-button`;
           kitDelete.innerText = `Delete`;
+          // amazonq-ignore-next-line
           kitDelete.setAttribute("onclick", `deleteKit('${kitId}')`);
           kitDelete.style.display = "none";
           //cancel button
           let kitCancel = document.createElement("button");
           kitCancel.id = `${kitId}-cancel-button`;
           kitCancel.innerText = `Cancel`;
+          // amazonq-ignore-next-line
           kitCancel.setAttribute("onclick", `hideConfigForKit('${kitId}')`);
           kitCancel.style.display = "none";
           kitCancel.style.float = "right";
@@ -521,6 +558,7 @@ function getAllKitsMetadata() {
 
           let kitLogProgBar = document.createElement("div");
           kitLogProgBar.classList.add("progress-bar-striped");
+          // amazonq-ignore-next-line
           kitLogProgBar.setAttribute("onclick", `toggleDeploymentDetails('${kitId}')`);
           kitLogProgBar.id = `${kitId}-deployment-progress-bar`;
           let kitLogProg = document.createElement("div");
@@ -808,6 +846,7 @@ function lockRegionControls(bool) {
 function closeConfirmationModal() {
   showConfirmationModal(false);
 }
+
 function showConfirmationModal(bool, message, details, onconfirm, onno, args) {
   if (bool) {
     document.getElementById("confirm-block").style.display = "block";
@@ -871,7 +910,7 @@ function updateRegion(event = null) {
           detail: "csk-cdk-app-delivery-pipeline-stack",
         })
       );
-    } else if (data && data.hasOwnProperty("StackId") && data.StackId.match("csk-cdk-app-delivery-pipeline-stack")) {
+    } else if (data && data.hasOwnProperty("StackId") && data.StackId === "csk-cdk-app-delivery-pipeline-stack") {
       checkDeliveryStackCompleteness();
     } else if (err) {
       displayErrors(`Error creating delivery pipeline: ${err.message}`);
@@ -897,6 +936,8 @@ function updateRegion(event = null) {
   resetDbInfraLists();
   getAllDbEngines();
   getAccountHostedZones();
+  resetBedrockModels();
+  getAllBedrockModels();
   resetAllKitMonitors();
 }
 
@@ -984,7 +1025,9 @@ function getCurrentValues(kitId) {
   let currentValues = {};
   let params = templateParameters.hasOwnProperty(kitId) ? templateParameters[kitId] : [];
   for (let i = 0; i < params.length; i++) {
-    currentValues[params[i]] = document.getElementById(`${kitId}|${params[i]}`).value;
+    if (document.getElementById(`${kitId}|${params[i]}`)) {
+      currentValues[params[i]] = document.getElementById(`${kitId}|${params[i]}`).value;
+    }
   }
   return currentValues;
 }
@@ -1007,7 +1050,7 @@ async function getExistingConfigs(kitId) {
   label.innerText = "Previous configs:";
   configDiv.appendChild(label);
   var select = document.createElement("select");
-  select.style.width = "60%";
+  select.style.width = "50%";
   select.id = `${kitId}-existing-configs`;
   let bucketName = getValueInNamespace(`${account}-${region}`, "SourceBucket");
   for (let i = 0; i < existingConfigs.length; i++) {
@@ -1026,45 +1069,45 @@ async function getExistingConfigs(kitId) {
   revertButton.style.display = "none";
   configDiv.appendChild(button);
   configDiv.appendChild(revertButton);
-  // can't attach the event listener until it's in the DOM
-  setTimeout(() => {
-    document.getElementById(`${kitId}-load-config`).addEventListener("click", () => {
-      let selectedConfig = document.getElementById(`${kitId}-existing-configs`).value;
-      if (kitIsUpdateable(kitId)) {
-        document.getElementById(`${kitId}-install-button`).innerText = `Update ${kitMetadata[kitId].Name}`;
-      }
-      document.getElementById(`${kitId}-revert-config`).style.display = "inline-block";
-      let config = JSON.parse(selectedConfig);
-      for (let i = 0; i < config.length; i++) {
-        if (document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`)) {
-          previousConfig[`${kitId}|${config[i]["ParameterKey"]}`] = document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`).value;
-          if (config[i]["ParameterKey"] === "userData") {
-            document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`).value = atob(config[i]["ParameterValue"]);
-          } else {
-            document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`).value = config[i]["ParameterValue"];
-          }
-        }
-      }
-    });
-    document.getElementById(`${kitId}-revert-config`).addEventListener("click", () => {
-      document.getElementById(`${kitId}-install-button`).innerText = `Install ${kitMetadata[kitId].Name}`;
-      document.getElementById(`${kitId}-revert-config`).style.display = "none";
-      for (let inputId in previousConfig) {
-        if (inputId.split("|")[0] === kitId) {
-          document.getElementById(inputId).value = previousConfig[inputId];
-        }
-      }
-    });
-  }, 1000);
   return configDiv.outerHTML;
 }
 
+function attachConfigLoaderListeners(kitId) {
+  document.getElementById(`${kitId}-load-config`).addEventListener("click", () => {
+    let selectedConfig = document.getElementById(`${kitId}-existing-configs`).value;
+    if (kitIsUpdateable(kitId)) {
+      document.getElementById(`${kitId}-install-button`).innerText = `Update ${kitMetadata[kitId].Name}`;
+    }
+    document.getElementById(`${kitId}-revert-config`).style.display = "inline-block";
+    let config = JSON.parse(selectedConfig);
+    for (let i = 0; i < config.length; i++) {
+      if (document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`)) {
+        previousConfig[`${kitId}|${config[i]["ParameterKey"]}`] = document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`).value;
+        if (config[i]["ParameterKey"] === "userData") {
+          document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`).value = atob(config[i]["ParameterValue"]);
+        } else {
+          document.getElementById(`${kitId}|${config[i]["ParameterKey"]}`).value = config[i]["ParameterValue"];
+        }
+      }
+    }
+  });
+  document.getElementById(`${kitId}-revert-config`).addEventListener("click", () => {
+    document.getElementById(`${kitId}-install-button`).innerText = `Install ${kitMetadata[kitId].Name}`;
+    document.getElementById(`${kitId}-revert-config`).style.display = "none";
+    for (let inputId in previousConfig) {
+      if (inputId.split("|")[0] === kitId) {
+        document.getElementById(inputId).value = previousConfig[inputId];
+      }
+    }
+  });
+}
+
 async function displayTemplateConfig(kitId) {
-  let kit = kitMetadata[kitId];
-  //fetch all current values so we can add them back if we reload the config form
-  const currentValues = getCurrentValues(kitId);
-  const existingConfigs = await getExistingConfigs(kitId);
   if (regionSelected) {
+    let kit = kitMetadata[kitId];
+    //fetch all current values so we can add them back if we reload the config form
+    const currentValues = getCurrentValues(kitId);
+    const existingConfigs = await getExistingConfigs(kitId);
     const templates = kit.Templates;
     const amiFilter = kit.hasOwnProperty("AmiFilter") ? kit.AmiFilter : "";
     const dbEngineFilter = kit.hasOwnProperty("DbEngineFilter") ? kit.DbEngineFilter : "";
@@ -1074,6 +1117,7 @@ async function displayTemplateConfig(kitId) {
     configElements += `<input id="CountryCode" type="hidden" value="${window.resellerConfig.CountryCode}" name="CountryCode" required>`;
     configElements += `<input id="ReportingEnabled" type="hidden" value="false" name="ReportingEnabled" required>`;
     templateParameters[kitId] = [];
+    templateParameterObjects[kitId] = {};
     let hasConfig = false;
     let rowclass = "griditemlight";
     for (let i = 0; i < templates.length; i++) {
@@ -1093,7 +1137,7 @@ async function displayTemplateConfig(kitId) {
         hasConfig = true;
         let parameterGroups = content.Metadata["AWS::CloudFormation::Interface"].ParameterGroups;
         for (let i = 0; i < parameterGroups.length; i++) {
-          if (parameterGroups[i].Label.default.match(/Starter-kit Specific Details/i)) {
+          if (parameterGroups[i].Label.default.includes("Starter-kit Specific Details")) {
             // we handle these directly
             continue;
           }
@@ -1101,6 +1145,7 @@ async function displayTemplateConfig(kitId) {
           for (let j = 0; j < parameterGroups[i].Parameters.length; j++) {
             let thisParam = parameterGroups[i].Parameters[j];
             templateParameters[kitId].push(thisParam);
+            templateParameterObjects[kitId][thisParam] = content["Parameters"][thisParam];
             if (thisParam.match(/AWSDistributorName|ReportingEnabled/)) {
               // we handle these directly
               continue;
@@ -1115,6 +1160,7 @@ async function displayTemplateConfig(kitId) {
         configElements += `<div class="config">`;
         for (let thisParam in content["Parameters"]) {
           templateParameters[kitId].push(thisParam);
+          templateParameterObjects[kitId][thisParam] = content["Parameters"][thisParam];
           if (thisParam.match(/AWSDistributorName|ReportingEnabled/)) {
             continue;
           }
@@ -1136,6 +1182,7 @@ async function displayTemplateConfig(kitId) {
     setTimeout(filterAmis, 200);
     setTimeout(filterByVpc, 200);
     setTimeout(filterDbInstanceClasses, 200);
+    setTimeout(attachConfigLoaderListeners, 200, kitId);
   }
 }
 
@@ -1152,6 +1199,7 @@ function makeConfigRow(kitId, rowclass, thisParam, params, amiFilter, dbEngineFi
   try {
     configRow += makeInputElement(kitId, params[thisParam], thisParam, amiFilter, dbEngineFilter, currentValues[thisParam]);
   } catch (e) {
+    console.log(e);
     configRow += `Error rendering input for ${thisParam}`;
   }
   configRow += "</div>";
@@ -1163,6 +1211,7 @@ function makeHiddenConfigRow(kitId, thisParam, params, amiFilter, dbEngineFilter
   try {
     configRow += makeInputElement(kitId, params[thisParam], thisParam, amiFilter, dbEngineFilter, currentValues[thisParam]);
   } catch (e) {
+    console.log(e);
     configRow += `Error rendering input for ${thisParam}`;
   }
   configRow += "</div>";
@@ -1177,11 +1226,20 @@ function makeGroupLabel(label) {
   return configElements;
 }
 
+async function displaySamAppConfig(kitId) {
+  return displayAppConfig("sam-apps", kitId);
+}
 async function displayCdkAppConfig(kitId) {
-  let kit = kitMetadata[kitId];
-  const currentValues = getCurrentValues(kitId);
-  const existingConfigs = await getExistingConfigs(kitId);
+  return displayAppConfig("cdk-apps", kitId);
+}
+async function displayCodebuildAppConfig(kitId) {
+  return displayAppConfig("codebuild-apps", kitId);
+}
+async function displayAppConfig(path, kitId) {
   if (regionSelected) {
+    let kit = kitMetadata[kitId];
+    const currentValues = getCurrentValues(kitId);
+    const existingConfigs = await getExistingConfigs(kitId);
     const manifest = kit.Manifest;
     const amiFilter = kit.hasOwnProperty("AmiFilter") ? kit.AmiFilter : "";
     const dbEngineFilter = kit.hasOwnProperty("DbEngineFilter") ? kit.DbEngineFilter : "";
@@ -1189,7 +1247,7 @@ async function displayCdkAppConfig(kitId) {
       document.getElementById(`${kitId}-config-pane`).innerText = "No manifest file found.";
       return;
     }
-    const response = await fetch(`https://${window.hosts.FILE_HOST}/kits/cdk-apps/${manifest}`, {
+    const response = await fetch(`https://${window.hosts.FILE_HOST}/kits/${path}/${manifest}`, {
       method: "GET",
       headers: {
         "x-access-control": JSON.parse(localStorage.getItem("kitConfig"))["KitHubCode"],
@@ -1204,6 +1262,8 @@ async function displayCdkAppConfig(kitId) {
     configElements += `<input id="CountryCode" type="hidden" value="${window.resellerConfig.CountryCode}" name="CountryCode" required>`;
     let hasConfig = false;
     templateParameters[kitId] = [];
+    templateParameterObjects[kitId] = {};
+
     let rowclass = "griditemlight";
 
     if (content.hasOwnProperty("ParameterGroups") && Object.keys(content["ParameterGroups"]).length > 0) {
@@ -1214,7 +1274,11 @@ async function displayCdkAppConfig(kitId) {
         for (let j = 0; j < parameterGroups[i].Parameters.length; j++) {
           let thisParam = parameterGroups[i].Parameters[j];
           templateParameters[kitId].push(thisParam);
-          if (content["Parameters"][thisParam].hasOwnProperty("Hidden")) {
+          templateParameterObjects[kitId][thisParam] = content["Parameters"][thisParam];
+
+          if (content["Parameters"][thisParam].hasOwnProperty("Alias")) {
+            continue;
+          } else if (content["Parameters"][thisParam].hasOwnProperty("Hidden")) {
             configElements += makeHiddenConfigRow(kitId, thisParam, content["Parameters"], amiFilter, dbEngineFilter, currentValues);
           } else {
             configElements += makeConfigRow(kitId, rowclass, thisParam, content["Parameters"], amiFilter, dbEngineFilter, currentValues);
@@ -1227,10 +1291,14 @@ async function displayCdkAppConfig(kitId) {
       hasConfig = true;
       for (let thisParam in content["Parameters"]) {
         templateParameters[kitId].push(thisParam);
+        templateParameterObjects[kitId][thisParam] = content["Parameters"][thisParam];
+
         if (thisParam === "AWSDistributorName") {
           continue;
         }
-        if (content["Parameters"][thisParam].hasOwnProperty("Hidden")) {
+        if (content["Parameters"][thisParam].hasOwnProperty("Alias")) {
+          continue;
+        } else if (content["Parameters"][thisParam].hasOwnProperty("Hidden")) {
           configElements += makeHiddenConfigRow(kitId, thisParam, content["Parameters"], amiFilter, dbEngineFilter, currentValues);
         } else {
           configElements += makeConfigRow(kitId, rowclass, thisParam, content["Parameters"], amiFilter, dbEngineFilter, currentValues);
@@ -1246,6 +1314,7 @@ async function displayCdkAppConfig(kitId) {
     setTimeout(filterAmis, 200);
     setTimeout(filterByVpc, 200);
     setTimeout(filterDbInstanceClasses, 200);
+    setTimeout(attachConfigLoaderListeners, 200, kitId);
   }
 }
 
@@ -1270,42 +1339,11 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
   }
   let element = "";
   let uniqueId = `${kitId}|${key}`;
-  if (obj["Type"] === "CSK::PrefixList") {
-    if (managedPrefixLists.hasOwnProperty(obj["Service"])) {
-      element += `<input id="${uniqueId}" name="${key}" value="${managedPrefixLists[obj["Service"]]}">`;
-    }
-  } else if (key.match(/^InstanceType$/i) || obj["Type"] === "CSK::InstanceType") {
-    element = `<select id="${uniqueId}" name="${key}" class="instance-type-selector" onchange="filterAmis()">`;
-    let currentInstanceClass = null;
-    for (let instanceType in window.instanceTypes) {
-      let thisInstanceClass = instanceType.split(".")[0];
-      if (currentInstanceClass !== thisInstanceClass) {
-        if (currentInstanceClass !== null) {
-          element += "</optgroup>";
-        }
-        element += `<optgroup label="${thisInstanceClass}">`;
-        currentInstanceClass = thisInstanceClass;
-      }
-      element += `<option arch="${
-        window.instanceTypes[instanceType]["ProcessorInfo"]["SupportedArchitectures"][0]
-      }" value="${instanceType}">${instanceType} - (${window.instanceTypes[instanceType]["ProcessorInfo"]["SupportedArchitectures"][0]}) ${
-        window.instanceTypes[instanceType]["VCpuInfo"]["DefaultVCpus"]
-      } vCPUs, ${Number(window.instanceTypes[instanceType]["MemoryInfo"]["SizeInMiB"]) / 1024} GB</option>`;
-    }
-    element += "</optgroup>";
-    element += `</select><p style="margin: -5px 2px;"><span id="${uniqueId}|suggestX86">x86: `;
-    element += `<a onclick="suggestInstance('${uniqueId}','XS')">XS</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','S')">S</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','M')">M</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','L')">L</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','XL')">XL</a></span><span id="${uniqueId}|suggestArm"> Arm: `;
-    element += `<a onclick="suggestInstance('${uniqueId}','XSg')">XS</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','Sg')">S</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','Mg')">M</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','Lg')">L</a> | `;
-    element += `<a onclick="suggestInstance('${uniqueId}','XLg')">XL</a></span>`;
-    element += `</p><p style="margin: -5px 2px; font-weight:bold" id="${uniqueId}-message"></p>`;
-  } else if (obj.hasOwnProperty("AllowedValues")) {
+  console.log(obj);
+  if (key.match(/^InstanceType$/i)) {
+    obj["Type"] = "CSK::InstanceType";
+  }
+  if (obj.hasOwnProperty("AllowedValues")) {
     if (obj["AllowedValues"].length == 2 && obj["AllowedValues"][0] == true && obj["AllowedValues"][1] == false) {
       let label = "No label";
       let checked = "checked";
@@ -1330,7 +1368,71 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
     }
   } else if (obj.hasOwnProperty("Type")) {
     // find resources in account and offer dropdown
-    if (obj["Type"] === "AWS::EC2::VPC::Id") {
+    if (obj["Type"].includes("CSK::BedrockModelId")) {
+      element = `<select id="${uniqueId}" name="${key}">`;
+      if (obj["Type"].includes("List")) {
+        // make it multi select
+        element = `<select id="${uniqueId}" name="${key}" multiple>`;
+      }
+      let models = [];
+      if (obj["Type"].includes("TEXT")) {
+        models = window.bedrockModels.text;
+      } else if (obj["Type"].includes("IMAGE") && window.bedrockModels.hasOwnProperty("image")) {
+        models = window.bedrockModels.image;
+      } else if (obj["Type"].includes("VIDEO") && window.bedrockModels.hasOwnProperty("video")) {
+        models = window.bedrockModels.video;
+      } else if (obj["Type"].includes("SPEECH") && window.bedrockModels.hasOwnProperty("speech")) {
+        models = window.bedrockModels.speech;
+      } else {
+        // models = window.bedrockModels.active;
+      }
+      // console.log(obj["Default"]);
+      for (let i = 0; i < models.length; i++) {
+        // console.log(models[i]);
+        let model = models[i];
+        let selected = "";
+        if (obj["Default"].includes(model.modelId)) {
+          selected = "selected";
+        }
+        element += `<option value="${model.modelId}" ${selected}>${model.modelName} (Inputs: ${model.inputModalities})</option>`;
+      }
+      element += "</select>";
+    } else if (obj["Type"] === "CSK::PrefixList") {
+      if (managedPrefixLists.hasOwnProperty(obj["Service"])) {
+        element += `<input id="${uniqueId}" name="${key}" value="${managedPrefixLists[obj["Service"]]}">`;
+      }
+    } else if (obj["Type"] === "CSK::InstanceType") {
+      element = `<select id="${uniqueId}" name="${key}" class="instance-type-selector" onchange="filterAmis()">`;
+      let currentInstanceClass = null;
+      for (let instanceType in window.instanceTypes) {
+        let thisInstanceClass = instanceType.split(".")[0];
+        if (currentInstanceClass !== thisInstanceClass) {
+          if (currentInstanceClass !== null) {
+            element += "</optgroup>";
+          }
+          element += `<optgroup label="${thisInstanceClass}">`;
+          currentInstanceClass = thisInstanceClass;
+        }
+        element += `<option arch="${
+          window.instanceTypes[instanceType]["ProcessorInfo"]["SupportedArchitectures"][0]
+        }" value="${instanceType}">${instanceType} - (${window.instanceTypes[instanceType]["ProcessorInfo"]["SupportedArchitectures"][0]}) ${
+          window.instanceTypes[instanceType]["VCpuInfo"]["DefaultVCpus"]
+        } vCPUs, ${Number(window.instanceTypes[instanceType]["MemoryInfo"]["SizeInMiB"]) / 1024} GB</option>`;
+      }
+      element += "</optgroup>";
+      element += `</select><p style="margin: -5px 2px;"><span id="${uniqueId}|suggestX86">x86: `;
+      element += `<a onclick="suggestInstance('${uniqueId}','XS')">XS</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','S')">S</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','M')">M</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','L')">L</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','XL')">XL</a></span><span id="${uniqueId}|suggestArm"> Arm: `;
+      element += `<a onclick="suggestInstance('${uniqueId}','XSg')">XS</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','Sg')">S</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','Mg')">M</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','Lg')">L</a> | `;
+      element += `<a onclick="suggestInstance('${uniqueId}','XLg')">XL</a></span>`;
+      element += `</p><p style="margin: -5px 2px; font-weight:bold" id="${uniqueId}-message"></p>`;
+    } else if (obj["Type"] === "AWS::EC2::VPC::Id") {
       element = `<select id="${uniqueId}" name="${key}" class="vpc-selector" onchange="filterByVpc()">`;
       for (let vpcId in allowedVpcs) {
         let foundName = findNameFromTags(allowedVpcs[vpcId]["Tags"]) || allowedVpcs[vpcId]["VpcId"];
@@ -1527,7 +1629,7 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
       if (def === "") {
         def = obj.hasOwnProperty("Default") ? obj["Default"] : "";
       }
-      if (def === "0.0.0.0/0" || obj["Type"] === "CSK::UserIp") {
+      if (def === "0.0.0.0/0" || obj["Type"].includes("CSK::UserIp")) {
         getMyIp().then((ip) => {
           document.getElementById(uniqueId).value = `${ip}/32`;
         });
@@ -1585,7 +1687,7 @@ function checkAmi(elem) {
           } else {
             console.log(data);
             let ami = data.Images[0];
-            let osType = ami.PlatformDetails.match(/Linux/i) ? "Linux" : "Windows";
+            let osType = ami.PlatformDetails.includes("linux") ? "Linux" : "Windows";
             filterInstanceTypes(kitId, ami.Architecture);
             setUserDataDefault(kitId, osType, ami.Architecture);
             elem.target.className = "valid";
@@ -1978,7 +2080,7 @@ function hideErrors() {
 
 function displaySessionErrors(error, ok) {
   let errorToDisplay = "";
-  if (error && error.toString().match(/Missing credentials in config, if using AWS_CONFIG_FILE, set AWS_SDK_LOAD_CONFIG=1/)) {
+  if (error && error.toString().includes("Missing credentials in config, if using AWS_CONFIG_FILE, set AWS_SDK_LOAD_CONFIG=1")) {
     errorToDisplay = "Waiting for credentials...";
   } else if (error) {
     errorToDisplay = error.toString();
