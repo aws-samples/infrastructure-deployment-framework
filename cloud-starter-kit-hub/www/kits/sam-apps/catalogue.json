@@ -1,0 +1,20 @@
+{
+  "Catalogue": [
+    {
+      "TopLevelCategory": "Common Patterns",
+      "Category": "Serverless",
+      "Description": "These kits deploy serverless application solutions into your account.",
+      "Kits": [
+        {
+          "Name": "SAM API Example",
+          "AppType": "SAM",
+          "Manifest": "sam-api-example.json",
+          "Description": "This kit deploys a SAM app in the target account. ",
+          "CostCalculator": "",
+          "Copyright": "© Guy Morton 2025",
+          "MoreInfo": "<img src='https://admin.cloud-starter-kit.com/images/no-csk-logo.png'> <p>This kit is supplied by AWS. <a target='_blank' href='https://aws.amazon.com/'>Visit the Amazon AWS site.</a>"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# buildspec.yml
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - cd $CODEBUILD_SRC_DIR
+      - pwd
+      - ls -l
+      - npm install aws-cdk -g
+  build:
+    commands:
+      - pwd
+      - ls -l
+      - git clone https://github.com/aws-samples/generative-ai-use-cases
+      - more generative-ai-use-cases/packages/cdk/cdk.json
+      - more cdk.json
+      - echo "copying cdk.json to project"
+      - cp cdk.json generative-ai-use-cases/packages/cdk/
+      - echo "project cdk.json now looks like this:"
+      - more generative-ai-use-cases/packages/cdk/cdk.json
+      - pushd generative-ai-use-cases
+      - npm ci
+      - npm run cdk:deploy:quick
+
+cache:
+  paths:
+    - "node_modules/**/*"

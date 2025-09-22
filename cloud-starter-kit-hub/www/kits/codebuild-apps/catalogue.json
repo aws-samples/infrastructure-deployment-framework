@@ -1,0 +1,18 @@
+{
+  "Catalogue": [
+    {
+      "TopLevelCategory": "Advanced Solutions",
+      "Category": "Generative AI",
+      "Kits": [
+        {
+          "Name": "Generative AI Use Cases",
+          "Description": "This kit tool that allows you to explore and build Generative AI solutions via a web browser.",
+          "Manifest": "genu.json",
+          "AllowUpdates": false,
+          "Copyright": "MIT-0 License",
+          "MoreInfo": "See <a href='https://github.com/aws-samples/generative-ai-use-cases'>the Github repository</a> for more information."
+        }
+      ]
+    }
+  ]
+}

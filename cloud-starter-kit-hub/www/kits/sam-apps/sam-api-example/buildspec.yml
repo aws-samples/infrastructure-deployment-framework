@@ -1,0 +1,23 @@
+version: 0.2
+env:
+  variables:
+    # these will be written by the app and must not be removed
+    S3_BUCKET: "S3_BUCKET_NAME"
+    STACK_NAME: "UNIQUE_STACK_NAME"
+phases:
+  install:
+    commands:
+      # Install all dependencies (including dependencies for running tests)
+      - npm install
+  pre_build:
+    commands:
+      # Do stuff
+  build:
+    commands:
+      # Use AWS SAM to package the application by using AWS CloudFormation
+      - aws cloudformation package --template template.yaml --s3-bucket $S3_BUCKET --output-template template-export.yml
+      - aws cloudformation deploy --template-file ./template-export.yml --stack-name $STACK_NAME --capabilities CAPABILITY_IAM --parameter-overrides file://parameters.json
+artifacts:
+  type: zip
+  files:
+    - template-export.yml

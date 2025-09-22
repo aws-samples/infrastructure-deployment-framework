@@ -1,0 +1,36 @@
+{
+  "ConfigFile": "parameters.json",
+  "Parameters": {
+    "ddbTableName": {
+      "Label": "DynamoDB Table Name",
+      "Description": "Specify a name for your DynamoDB table (note that this is not generally recommended, it's here to demonstrate passing config to the SAM app).",
+      "Type": "String",
+      "Default": "mytable",
+      "AllowedPattern": "\\w{3,30}"
+    },
+    "uniqueStackId": {
+      "Label": "Unique Stack ID",
+      "Description": "A string that will be included in the stack name to make it unique.",
+      "Type": "String",
+      "Default": "mystack",
+      "AllowedPattern": "\\w{3,30}"
+    }
+  },
+  "Tags": {},
+  "Stacks": [
+    {
+      "name": "csk-sam-api-example-{uniqueStackId}-stack",
+      "resourceCount": 16,
+      "hasOutputs": true
+    }
+  ],
+  "FileList": [
+    "sam-api-example/template.yaml",
+    "sam-api-example/buildspec.yml",
+    "sam-api-example/src/handlers/get-all-items.mjs",
+    "sam-api-example/src/handlers/get-by-id.mjs",
+    "sam-api-example/src/handlers/put-item.mjs",
+    "sam-api-example/package.json",
+    "sam-api-example/parameters-template.json"
+  ]
+}

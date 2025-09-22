@@ -1,0 +1,96 @@
+{
+  "ConfigFile": "cdk.json",
+  "Parameters": {
+    "context.env": {
+      "Label": "Environment Label",
+      "Description": "Optional. The environment label you wish to apply to this deployment, eg 'test', 'prod' etc. Can be any short string.",
+      "Type": "string",
+      "Default": ""
+    },
+    "context.hostedZoneId": {
+      "Label": "Hosted Zone ID",
+      "Description": "Name of an existing hosted zone",
+      "Type": "AWS::Route53::HostedZone::Id"
+    },
+    "context.hostName": {
+      "Label": "Subdomain",
+      "Description": "String to prepend to the domain name to form the fully qualified domain name.",
+      "Type": "String",
+      "Default": "www"
+    },
+    "context.domainName": {
+      "Alias": "context.hostedZoneId-zonename"
+    },
+    "context.allowedIpV4AddressRanges": {
+      "Label": "Inbound IPv4 range",
+      "Description": "The IP address range that will connect to GenU (defaults to your external IP)",
+      "Type": "List<CSK::UserIp>",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    },
+    "context.modelRegion": {
+      "Type": "CSK::Region",
+      "Label": "Model Region",
+      "Description": "The Region where the models you are using are located.",
+      "Default": "us-west-2"
+    },
+    "context.modelIds": {
+      "Label": "Text Generation Models",
+      "Description": "Models to allow access to for text use-cases",
+      "Type": "List<CSK::BedrockModelId::TEXT>",
+      "Default": [
+        "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        "us.anthropic.claude-opus-4-20250514-v1:0",
+        "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+        "us.amazon.nova-premier-v1:0",
+        "us.amazon.nova-pro-v1:0",
+        "us.amazon.nova-lite-v1:0",
+        "us.amazon.nova-micro-v1:0",
+        "us.deepseek.r1-v1:0"
+      ]
+    },
+    "context.imageGenerationModelIds": {
+      "Label": "Image Generation Models",
+      "Description": "Models to allow access to for image use-cases",
+      "Type": "List<CSK::BedrockModelId::IMAGE>",
+      "Default": ["amazon.nova-canvas-v1:0"]
+    },
+    "context.videoGenerationModelIds": {
+      "Label": "Video Generation Models",
+      "Description": "Models to allow access to for video use-cases",
+      "Type": "List<CSK::BedrockModelId::VIDEO>",
+      "Default": ["amazon.nova-reel-v1:0"]
+    },
+    "context.speechToSpeechModelIds": {
+      "Label": "Speech Generation Models",
+      "Description": "Models to allow access to for speech use-cases",
+      "Type": "List<CSK::BedrockModelId::SPEECH>",
+      "Default": ["amazon.nova-sonic-v1:0"]
+    },
+    "context.crossAccountBedrockRoleArn": {
+      "Label": "Bedrock Role ARN",
+      "Description": "Optional - if you have a specific IAM role you wish to use, otherwise one will be created for you.",
+      "Type": "string",
+      "Default": ""
+    }
+  },
+  "Tags": {},
+  "Stacks": [
+    {
+      "name": "CloudFrontWafStack{context.env}",
+      "resourceCount": 4,
+      "hasOutputs": true
+    },
+    {
+      "name": "VideoTmpBucketStack{context.env}us-east-1",
+      "resourceCount": 6,
+      "hasOutputs": true
+    },
+    {
+      "name": "GenerativeAiUseCasesStack{context.env}",
+      "resourceCount": 404,
+      "hasOutputs": true
+    }
+  ],
+  "FileList": ["genu/buildspec.yml", "genu/cdk-template.json"]
+}
