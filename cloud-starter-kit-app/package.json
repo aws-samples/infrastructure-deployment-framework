@@ -29,7 +29,7 @@
     "@electron-forge/maker-squirrel": "^6.4.2",
     "@electron-forge/maker-zip": "^6.4.2",
     "@eslint/js": "^9.11.0",
-    "electron": "^39.2.1",
+    "electron": "^40.0.0-beta.4",
     "eslint": "^5.16.0",
     "globals": "^15.9.0",
     "uglify-js": "^3.19.3"
