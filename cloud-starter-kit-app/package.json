@@ -9,7 +9,15 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "dir": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "build": "node esbuild.config.js",
+    "build:dev": "node esbuild.config.js --dev",
+    "build:watch": "node esbuild.config.js --dev --watch",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix",
+    "format": "prettier --write \"src/**/*.{js,css,html}\"",
+    "format:check": "prettier --check \"src/**/*.{js,css,html}\"",
+    "update-deps": "node scripts/update-dependencies.js"
   },
   "keywords": [
     "Electron",
@@ -28,10 +36,10 @@
     "@electron-forge/maker-rpm": "^6.4.2",
     "@electron-forge/maker-squirrel": "^6.4.2",
     "@electron-forge/maker-zip": "^6.4.2",
-    "@eslint/js": "^9.11.0",
-    "electron": "^40.0.0-beta.4",
-    "eslint": "^5.16.0",
+    "electron": "^41.0.0-beta.5",
+    "esbuild": "^0.27.2",
     "globals": "^15.9.0",
+    "prettier": "^3.8.1",
     "uglify-js": "^3.19.3"
   },
   "dependencies": {
