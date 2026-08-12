@@ -54,6 +54,16 @@
     "Resources": {
         "QBusinessCommonDataSourceRole": {
             "Type": "AWS::IAM::Role",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W11",
+                            "reason": "Q Business data source role requires broad permissions as the application, index, and data source resources are created dynamically. EC2 network interface actions require wildcard. Scoping is applied via the service principal trust policy."
+                        }
+                    ]
+                }
+            },
             "Properties": {
                 "RoleName": "QBusinessOneDriveServiceRole",
                 "AssumeRolePolicyDocument": {
@@ -78,10 +88,11 @@
                                     "Effect": "Allow",
                                     "Action": [
                                         "secretsmanager:GetSecretValue",
-                                        "secretsmanager:DescribeSecret",
-                                        "secretsmanager:ListSecrets"
+                                        "secretsmanager:DescribeSecret"
                                     ],
-                                    "Resource": "*"
+                                    "Resource": {
+                                        "Ref": "OneDriveCredentialsSecret"
+                                    }
                                 },
                                 {
                                     "Effect": "Allow",
@@ -246,6 +257,7 @@
             "Properties": {
                 "Name": "QBusiness-OneDrive-Credentials",
                 "Description": "Secret to store OneDrive client id & secret",
+                "KmsKeyId": "alias/aws/secretsmanager",
                 "SecretString": {
                     "Fn::Sub": "{\n    \"clientId\": \"${OneDriveClientID}\",\n    \"clientSecret\": \"${OneDriveSecretValue}\"\n}\n"
                 },

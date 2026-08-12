@@ -117,6 +117,400 @@ function convertRegionCodeToName(code) {
   return codes.hasOwnProperty(code) ? codes[code] : code;
 }
 
+// Stack status constants and helpers
+const TASK_STATES = {
+  WAITING: "waiting",
+  STARTED: "started",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETE: "COMPLETE",
+  FAILED: "FAILED",
+  FAILED_NEEDS_DELETION: "FAILED_NEEDS_DELETION",
+  DELETED: "DELETED",
+  DELETE_FAILED: "DELETE_FAILED",
+};
+
+const BOUNCY_BOX = `<span class="la-square-jelly-box la-dark la-sm" style="margin-left: 3px; margin-right: 10px; margin-bottom: -1px; display: inline-block; color: black; height: 12px; width: 12px;"><div></div><div></div></span>`;
+
+function evaluateStatus(status) {
+  if (!status) return TASK_STATES.IN_PROGRESS;
+  const statusUpper = status.toUpperCase();
+  if (statusUpper.match(/(CREATE_COMPLETE|UPDATE_COMPLETE|IMPORT_COMPLETE|UPDATE_ROLLBACK_COMPLETE)/)) {
+    return TASK_STATES.COMPLETE;
+  }
+  if (statusUpper.match(/(ROLLBACK_COMPLETE|CREATE_FAILED|UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED)/)) {
+    return TASK_STATES.FAILED_NEEDS_DELETION;
+  }
+  if (statusUpper.match(/DELETE_COMPLETE/)) return TASK_STATES.DELETED;
+  if (statusUpper.match(/DELETE_FAILED/)) return TASK_STATES.DELETE_FAILED;
+  if (statusUpper.match(/FAILED/)) return TASK_STATES.FAILED;
+  return TASK_STATES.IN_PROGRESS;
+}
+
+function labelStatus(status) {
+  if (!status) return BOUNCY_BOX;
+  const state = evaluateStatus(status);
+  switch (state) {
+    case TASK_STATES.COMPLETE:
+      return `${status}  ✅`;
+    case TASK_STATES.FAILED:
+    case TASK_STATES.FAILED_NEEDS_DELETION:
+    case TASK_STATES.DELETED:
+    case TASK_STATES.DELETE_FAILED:
+      return `${status}  ❌`;
+    default:
+      return `${status}  ${BOUNCY_BOX}`;
+  }
+}
+
+function getConsoleUrl(region, stackId, view = "stackinfo") {
+  if (!region || !stackId) return "";
+  return `https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/${view}?stackId=${stackId}`;
+}
+
+function getPipelineConsoleUrl(region, pipelineName, executionId = null) {
+  if (!region || !pipelineName) return "";
+  const baseUrl = `https://${region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${pipelineName}`;
+  if (executionId) {
+    return `${baseUrl}/executions/${executionId}/visualization?region=${region}`;
+  }
+  return baseUrl;
+}
+
+function isTerminalStatus(status) {
+  const state = evaluateStatus(status);
+  return [
+    TASK_STATES.COMPLETE,
+    TASK_STATES.FAILED,
+    TASK_STATES.FAILED_NEEDS_DELETION,
+    TASK_STATES.DELETED,
+    TASK_STATES.DELETE_FAILED,
+  ].includes(state);
+}
+
+function isSuccessStatus(status) {
+  return evaluateStatus(status) === TASK_STATES.COMPLETE;
+}
+
+function isFailedStatus(status) {
+  const state = evaluateStatus(status);
+  return [TASK_STATES.FAILED, TASK_STATES.FAILED_NEEDS_DELETION, TASK_STATES.DELETE_FAILED].includes(state);
+}
+/**
+ * StackMonitor Class
+ * Manages CloudFormation stack monitoring with polling and state tracking
+ */
+
+/**
+ * StackMonitor handles the lifecycle of monitoring CloudFormation stacks
+ * Encapsulates polling logic, state management, and timeout handling
+ */
+class StackMonitor {
+  constructor(options = {}) {
+    // Configuration
+    this.preMonitoringDelay = options.preMonitoringDelay || 1; // seconds
+    this.monitoringTimeout = options.monitoringTimeout || 1800; // seconds
+    this.pollInterval = options.pollInterval || 3000; // milliseconds
+    this.timeoutCheckInterval = options.timeoutCheckInterval || 3000; // milliseconds
+
+    // State tracking
+    this.stackStates = {};
+    this.lastReportedStates = {};
+    this.stackEvents = {};
+    this.stackInfoRequestors = {};
+    this.stackOutputs = {};
+    this.debugMessages = {};
+    this.allStacks = {};
+    this.eventOutput = {};
+    this.previousEventOutput = {};
+    this.htmlCfnOutputs = {};
+
+    // Timing
+    this.mostRecentEventTime = null;
+
+    // Polling instances
+    this.mainMonitor = null;
+    this.timeoutMonitor = null;
+
+    // Callbacks
+    this.onStackUpdate = options.onStackUpdate || null;
+    this.onTimeout = options.onTimeout || null;
+  }
+
+  /**
+   * Starts monitoring with a delay
+   */
+  startMonitoring() {
+    console.log(`Stack monitoring starting in ${this.preMonitoringDelay}s`);
+
+    setTimeout(() => {
+      this.mainMonitor = setInterval(() => {
+        this._pollStacks();
+      }, this.pollInterval);
+
+      this.timeoutMonitor = setTimeout(() => {
+        this._checkTimeout();
+      }, this.monitoringTimeout * 1000);
+    }, this.preMonitoringDelay * 1000);
+  }
+
+  /**
+   * Stops all monitoring activities
+   */
+  stopMonitoring() {
+    console.log("Stack monitoring STOPPED");
+
+    if (this.mainMonitor) {
+      clearInterval(this.mainMonitor);
+      this.mainMonitor = null;
+    }
+
+    if (this.timeoutMonitor) {
+      clearTimeout(this.timeoutMonitor);
+      this.timeoutMonitor = null;
+    }
+
+    // Clear all stack info requestors
+    Object.keys(this.stackInfoRequestors).forEach((stack) => {
+      clearInterval(this.stackInfoRequestors[stack]);
+    });
+    this.stackInfoRequestors = {};
+  }
+
+  /**
+   * Resets all state to initial values
+   */
+  reset() {
+    this.stopMonitoring();
+
+    this.stackStates = {};
+    this.lastReportedStates = {};
+    this.stackEvents = {};
+    this.stackInfoRequestors = {};
+    this.stackOutputs = {};
+    this.debugMessages = {};
+    this.allStacks = {};
+    this.eventOutput = {};
+    this.previousEventOutput = {};
+    this.htmlCfnOutputs = {};
+    this.mostRecentEventTime = null;
+  }
+
+  /**
+   * Updates the most recent event time
+   * @param {Date|string|number} timestamp - Event timestamp
+   */
+  updateEventTime(timestamp) {
+    const eventTime = new Date(timestamp).getTime();
+
+    if (!this.mostRecentEventTime || eventTime > this.mostRecentEventTime) {
+      this.mostRecentEventTime = eventTime;
+    }
+  }
+
+  /**
+   * Sets the state for a stack
+   * @param {string} stackName - Stack name
+   * @param {object} state - Stack state object
+   */
+  setStackState(stackName, state) {
+    if (!this.stackStates[stackName]) {
+      this.stackStates[stackName] = {};
+    }
+    this.stackStates[stackName] = state;
+  }
+
+  /**
+   * Gets the state for a stack
+   * @param {string} stackName - Stack name
+   * @returns {object|null} Stack state or null
+   */
+  getStackState(stackName) {
+    return this.stackStates[stackName] || null;
+  }
+
+  /**
+   * Sets events for a stack
+   * @param {string} stackName - Stack name
+   * @param {object} events - Stack events object
+   */
+  setStackEvents(stackName, events) {
+    this.stackEvents[stackName] = events || {};
+  }
+
+  /**
+   * Gets events for a stack
+   * @param {string} stackName - Stack name
+   * @returns {object} Stack events
+   */
+  getStackEvents(stackName) {
+    return this.stackEvents[stackName] || {};
+  }
+
+  /**
+   * Checks if a stack's state has changed
+   * @param {string} stackName - Stack name
+   * @param {string} currentStatus - Current status
+   * @returns {boolean} True if state changed
+   */
+  hasStateChanged(stackName, currentStatus) {
+    return this.lastReportedStates[stackName] !== currentStatus;
+  }
+
+  /**
+   * Updates the last reported state
+   * @param {string} stackName - Stack name
+   * @param {string} status - Status to record
+   */
+  updateLastReportedState(stackName, status) {
+    this.lastReportedStates[stackName] = status;
+  }
+
+  /**
+   * Starts requesting stack info at intervals
+   * @param {string} stackName - Stack name
+   * @param {Function} callback - Callback function
+   * @param {number} interval - Interval in milliseconds
+   */
+  startStackInfoRequestor(stackName, callback, interval = 3000) {
+    if (!this.stackInfoRequestors[stackName]) {
+      this.stackInfoRequestors[stackName] = setInterval(callback, interval, stackName);
+    }
+  }
+
+  /**
+   * Stops requesting stack info for a stack
+   * @param {string} stackName - Stack name
+   */
+  stopStackInfoRequestor(stackName) {
+    if (this.stackInfoRequestors[stackName]) {
+      clearInterval(this.stackInfoRequestors[stackName]);
+      delete this.stackInfoRequestors[stackName];
+    }
+  }
+
+  /**
+   * Sets outputs for a stack
+   * @param {string} stackName - Stack name
+   * @param {Array} outputs - Stack outputs array
+   */
+  setStackOutputs(stackName, outputs) {
+    this.stackOutputs[stackName] = outputs;
+  }
+
+  /**
+   * Gets outputs for a stack
+   * @param {string} stackName - Stack name
+   * @returns {Array} Stack outputs
+   */
+  getStackOutputs(stackName) {
+    return this.stackOutputs[stackName] || [];
+  }
+
+  /**
+   * Sets a debug message for a stack
+   * @param {string} stackName - Stack name
+   * @param {string|object} message - Debug message
+   */
+  setDebugMessage(stackName, message) {
+    this.debugMessages[stackName] = message;
+  }
+
+  /**
+   * Gets debug message for a stack
+   * @param {string} stackName - Stack name
+   * @returns {string|object|null} Debug message
+   */
+  getDebugMessage(stackName) {
+    return this.debugMessages[stackName] || null;
+  }
+
+  /**
+   * Gets all debug messages
+   * @returns {object} All debug messages
+   */
+  getAllDebugMessages() {
+    return this.debugMessages;
+  }
+
+  /**
+   * Sets all stacks data
+   * @param {object} stacks - Stacks object keyed by stack ID
+   */
+  setAllStacks(stacks) {
+    this.allStacks = stacks;
+  }
+
+  /**
+   * Gets all stacks data
+   * @returns {object} All stacks
+   */
+  getAllStacks() {
+    return this.allStacks;
+  }
+
+  /**
+   * Gets a specific stack by ID
+   * @param {string} stackId - Stack ID
+   * @returns {object|null} Stack object or null
+   */
+  getStack(stackId) {
+    return this.allStacks[stackId] || null;
+  }
+
+  /**
+   * Private method to poll stacks
+   */
+  _pollStacks() {
+    if (this.onStackUpdate && typeof this.onStackUpdate === "function") {
+      this.onStackUpdate();
+    }
+  }
+
+  /**
+   * Private method to check for timeout
+   */
+  _checkTimeout() {
+    const timeNow = new Date().getTime();
+    const timeSinceLastEvent = timeNow - (this.mostRecentEventTime || timeNow);
+
+    if (timeSinceLastEvent > this.monitoringTimeout * 1000) {
+      console.warn(`Monitoring timeout reached after ${this.monitoringTimeout}s`);
+
+      if (this.onTimeout && typeof this.onTimeout === "function") {
+        this.onTimeout(this.monitoringTimeout);
+      }
+
+      this.stopMonitoring();
+    } else {
+      // Schedule next check
+      this.timeoutMonitor = setTimeout(() => {
+        this._checkTimeout();
+      }, this.timeoutCheckInterval);
+    }
+  }
+
+  /**
+   * Gets the count of stacks being monitored
+   * @returns {number} Number of stacks
+   */
+  getStackCount() {
+    return Object.keys(this.stackStates).length;
+  }
+
+  /**
+   * Checks if monitoring is active
+   * @returns {boolean} True if monitoring
+   */
+  isMonitoring() {
+    return this.mainMonitor !== null;
+  }
+}
+
+// Export for use in other modules
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = StackMonitor;
+}
+
 
 /*
 * ###########################################
@@ -133,16 +527,7 @@ const TASK_TYPES = {
   CREATE_KEY: "create-key-pair",
   OTHER: "other",
 };
-const TASK_STATES = {
-  WAITING: "waiting",
-  STARTED: "started",
-  IN_PROGRESS: "in-progress",
-  COMPLETE: "complete",
-  FAILED: "failed",
-  FAILED_NEEDS_DELETION: "failed-needs-deletion",
-  DELETED: "deleted",
-  DELETE_FAILED: "delete-failed",
-};
+// TASK_STATES is defined in utilities.js (concatenated before this file)
 const TASK_EVENTS = {
   LOADING_COMPLETE: "LOADING_COMPLETE",
   KEY_READY: "KEY_READY",
@@ -348,7 +733,8 @@ function showTaskQueueLength() {
   } else {
     lockRegionControls(false);
   }
-  document.getElementById("tasks-display").innerText = `${taskQueue.length > 0 ? taskQueue.length : "No"} task${taskQueue.length > 1 ? "s" : ""} running`;
+  document.getElementById("tasks-display").innerText =
+    `${taskQueue.length > 0 ? taskQueue.length : "No"} task${taskQueue.length > 1 ? "s" : ""} running`;
 }
 
 setInterval(checkTasksFromStackList, 5000);
@@ -362,220 +748,359 @@ setInterval(showTaskQueueLength, 1000);
 * ###########################################
 */
 
-// the little bouncing box
-const bouncyBox = `<span class="la-square-jelly-box la-dark la-sm" style="margin-left: 3px; margin-right: 10px; margin-bottom: -1px; display: inline-block; color: black; height: 12px; width: 12px;"><div></div><div></div></span>`;
-// delay before we start monitoring, to give app time to upload the template etc
-const preMonitoringDelay = 1;
-// monitoring timeout - stop monitoring for events after this many seconds elapses with no events
-const monitoringTimeout = 1800;
-// cfMonitor is the setTimeout instance that triggers the monitoring actions
-let cfMonitor = null;
-let longCfMonitor = null;
-// stackStates tracks the state of each stack, keyed on stack name
-let stackStates = {};
-// lastReportedStates tracks the last reported state of each stack, keyed on stack name
-let lastReportedStates = {};
-// stackEvents tracks the state of resource events, keyed on stack name
-let stackEvents = {};
-// stackInfoRequestors tracks the setInterval instance that requests stack outputs, keyed on stack name
-let stackInfoRequestors = {};
-// stackOutputs hold the outputs the stack generates, if any
-let stackOutputs = {};
-// any messages from the deploy stack command that need to be shown to the user
-let debugMessages = {};
-// the time of the last received event
-let mostRecentEventTime = null;
+/**
+ * Stack Monitoring Module
+ * Handles CloudFormation stack monitoring, event tracking, and UI updates
+ */
 
-let allStacks = {};
+// All utilities are defined in utilities.js (concatenated before this file)
+// StackMonitor class, TASK_STATES, evaluateStatus, labelStatus, etc. are already available
 
+// Create a global stack monitor instance
+const stackMonitor = new StackMonitor({
+  preMonitoringDelay: 1,
+  monitoringTimeout: 1800,
+  pollInterval: 3000,
+  onStackUpdate: showStacksProgressFunc,
+  onTimeout: handleMonitoringTimeout,
+});
+
+// Legacy compatibility - expose monitor state
+let stackStates = stackMonitor.stackStates;
+let lastReportedStates = stackMonitor.lastReportedStates;
+let stackEvents = stackMonitor.stackEvents;
+let stackInfoRequestors = stackMonitor.stackInfoRequestors;
+let stackOutputs = stackMonitor.stackOutputs;
+let debugMessages = stackMonitor.debugMessages;
+let allStacks = stackMonitor.allStacks;
+
+// For backward compatibility
+const bouncyBox = BOUNCY_BOX;
+
+/**
+ * Lists all CloudFormation stacks and displays them in the UI
+ */
 function listAllStacks() {
   window.listStacks((err, stacks) => {
     if (err) {
       console.error(err);
-    } else {
-      console.log(stacks);
-      allStacks = {};
-      for (let i = 0; i < stacks.Stacks.length; i++) {
-        allStacks[stacks.Stacks[i].StackId] = stacks.Stacks[i];
-      }
-      let parentNode = document.getElementById("deployed-stacks");
-      parentNode.innerText = "";
-      let stackDiv = document.createElement("div");
-      stackDiv.classList.add("scrollable");
-      let pageHeading = document.createElement("h1");
-      pageHeading.classList = ["installed-kits-heading"];
-      pageHeading.innerText = "Installed Kits";
-      let pageInfo = document.createElement("p");
-      pageInfo.innerText = "This is a listing of the kits that have been deployed as CloudFormation stacks into this account.";
-      stackDiv.appendChild(pageHeading);
-      stackDiv.appendChild(pageInfo);
-      for (const stack in allStacks) {
-        if (allStacks[stack].StackName.match(/sendStatisticsStack/)) {
-          continue;
-        }
-        if (allStacks[stack].hasOwnProperty("RootId") && allStacks[stack].RootId.match(/\w/)) {
-          console.log("not showing nexted stack");
-          continue;
-        }
-        let stackTags = allStacks[stack].Tags;
-        let tags = {};
-        for (let i = 0; i < stackTags.length; i++) {
-          tags[stackTags[i].Key] = stackTags[i].Value;
-        }
-        if (tags.hasOwnProperty("KitId") || allStacks[stack].StackName === "CDKToolkit") {
-          // it's a kit stack
-          let name = allStacks[stack].StackName;
-          let kit = getFromKitMetadata(tags["KitId"]);
-          if (kit) {
-            //we found the kit
-            name = kit.Name;
-          }
-          let stackName = document.createElement("h5");
-          stackName.classList.add("sub-heading");
-          stackName.innerText = name;
-          let stackStatus = document.createElement("p");
-          appendHtmlToNode(stackStatus, `<b>Status:</b> ${labelStatus(allStacks[stack].StackStatus)}`);
-          let stackDesc = document.createElement("p");
-          stackDesc.innerText = allStacks[stack].Description ? allStacks[stack].Description : "No description available";
-          let stackLinks = document.createElement("p");
-          let stackInputsLink = document.createElement("a");
-          stackInputsLink.innerText = "⬆️ Inputs";
-          stackInputsLink.classList = ["stack-info"];
-          stackInputsLink.setAttribute("onclick", `showInputs("${allStacks[stack].StackId}")`);
-          let stackOutputsLink = document.createElement("a");
-          stackOutputsLink.innerText = "⬇️ Outputs";
-          stackOutputsLink.classList = ["stack-info"];
-          stackOutputsLink.setAttribute("onclick", `showOutputs("${allStacks[stack].StackId}")`);
-          let stackConsoleLink = document.createElement("a");
-          stackConsoleLink.innerText = "👀 View in Console";
-          stackConsoleLink.classList = ["stack-info"];
-          stackConsoleLink.setAttribute("onclick", `goToConsole("${allStacks[stack].StackId}")`);
-          let stackMetadata = document.createElement("div");
-          stackMetadata.id = `${allStacks[stack].StackId}-metadata`;
-          stackMetadata.classList.add("deployed-kit-metadata");
-          stackLinks.appendChild(stackInputsLink);
-          stackLinks.appendChild(stackOutputsLink);
-          if (evaluateStatus(allStacks[stack].StackStatus) === TASK_STATES.FAILED_NEEDS_DELETION) {
-            let stackDeleteLink = document.createElement("a");
-            stackDeleteLink.innerText = "🗑️ Delete";
-            stackDeleteLink.classList = ["stack-info"];
-            stackDeleteLink.setAttribute("onclick", `confirmDeleteStack("${allStacks[stack].StackId}")`);
-            stackLinks.appendChild(stackDeleteLink);
-          }
-          stackLinks.appendChild(stackConsoleLink);
-          stackDiv.appendChild(stackName);
-          stackDiv.appendChild(stackStatus);
-          stackDiv.appendChild(stackDesc);
-          stackDiv.appendChild(stackLinks);
-          stackDiv.appendChild(stackMetadata);
-        } else {
-          continue;
-        }
-      }
-      parentNode.appendChild(stackDiv);
+      return;
     }
+
+    console.log(stacks);
+    allStacks = {};
+
+    // Build stacks lookup
+    for (let i = 0; i < stacks.Stacks.length; i++) {
+      allStacks[stacks.Stacks[i].StackId] = stacks.Stacks[i];
+    }
+
+    stackMonitor.setAllStacks(allStacks);
+
+    const parentNode = document.getElementById("deployed-stacks");
+    if (!parentNode) return;
+
+    parentNode.innerText = "";
+
+    const stackDiv = document.createElement("div");
+    stackDiv.classList.add("scrollable");
+
+    const pageHeading = document.createElement("h1");
+    pageHeading.classList = ["installed-kits-heading"];
+    pageHeading.innerText = "Installed Kits";
+
+    const pageInfo = document.createElement("p");
+    pageInfo.innerText = "This is a listing of the kits that have been deployed as CloudFormation stacks into this account.";
+
+    stackDiv.appendChild(pageHeading);
+    stackDiv.appendChild(pageInfo);
+
+    // Render each stack
+    for (const stackId in allStacks) {
+      const stack = allStacks[stackId];
+
+      // Skip statistics stacks
+      if (stack.StackName.match(/sendStatisticsStack/)) {
+        continue;
+      }
+
+      // Skip nested stacks
+      if (stack.hasOwnProperty("RootId") && stack.RootId.match(/\w/)) {
+        console.log("not showing nested stack");
+        continue;
+      }
+
+      // Parse tags
+      const stackTags = stack.Tags || [];
+      const tags = {};
+      for (let i = 0; i < stackTags.length; i++) {
+        tags[stackTags[i].Key] = stackTags[i].Value;
+      }
+
+      // Only show kit stacks
+      if (!tags.hasOwnProperty("KitId") && stack.StackName !== "CDKToolkit") {
+        continue;
+      }
+
+      // Render stack card
+      renderStackCard(stackDiv, stack, tags);
+    }
+
+    parentNode.appendChild(stackDiv);
+
+    // Attach event listeners after rendering
+    attachStackEventListeners();
   });
 }
 
-function confirmDeleteStack(stackName) {
+/**
+ * Renders a single stack card
+ * @param {HTMLElement} container - Container element
+ * @param {object} stack - Stack object
+ * @param {object} tags - Stack tags
+ */
+function renderStackCard(container, stack, tags) {
+  // Determine display name
+  let name = stack.StackName;
+  const kit = getFromKitMetadata(tags["KitId"]);
+  if (kit) {
+    name = kit.Name;
+  }
+
+  // Create elements
+  const stackName = document.createElement("h5");
+  stackName.classList.add("sub-heading");
+  stackName.innerText = name;
+
+  const stackStatus = document.createElement("p");
+  appendHtmlToNode(stackStatus, `<b>Status:</b> ${labelStatus(stack.StackStatus)}`);
+
+  const stackDesc = document.createElement("p");
+  stackDesc.innerText = stack.Description || "No description available";
+
+  const stackLinks = document.createElement("p");
+
+  // Inputs link
+  const stackInputsLink = document.createElement("a");
+  stackInputsLink.innerText = "⬆️ Inputs";
+  stackInputsLink.classList = ["stack-info"];
+  stackInputsLink.dataset.stackId = stack.StackId;
+  stackInputsLink.dataset.action = "showInputs";
+  stackLinks.appendChild(stackInputsLink);
+
+  // Outputs link
+  const stackOutputsLink = document.createElement("a");
+  stackOutputsLink.innerText = "⬇️ Outputs";
+  stackOutputsLink.classList = ["stack-info"];
+  stackOutputsLink.dataset.stackId = stack.StackId;
+  stackOutputsLink.dataset.action = "showOutputs";
+  stackLinks.appendChild(stackOutputsLink);
+
+  // Delete link (if needed)
+  if (evaluateStatus(stack.StackStatus) === TASK_STATES.FAILED_NEEDS_DELETION) {
+    const stackDeleteLink = document.createElement("a");
+    stackDeleteLink.innerText = "🗑️ Delete";
+    stackDeleteLink.classList = ["stack-info"];
+    stackDeleteLink.dataset.stackId = stack.StackId;
+    stackDeleteLink.dataset.action = "confirmDelete";
+    stackLinks.appendChild(stackDeleteLink);
+  }
+
+  // Console link
+  const stackConsoleLink = document.createElement("a");
+  stackConsoleLink.innerText = "👀 View in Console";
+  stackConsoleLink.classList = ["stack-info"];
+  stackConsoleLink.dataset.stackId = stack.StackId;
+  stackConsoleLink.dataset.action = "goToConsole";
+  stackLinks.appendChild(stackConsoleLink);
+
+  // Metadata container
+  const stackMetadata = document.createElement("div");
+  stackMetadata.id = `${stack.StackId}-metadata`;
+  stackMetadata.classList.add("deployed-kit-metadata");
+
+  // Append all elements
+  container.appendChild(stackName);
+  container.appendChild(stackStatus);
+  container.appendChild(stackDesc);
+  container.appendChild(stackLinks);
+  container.appendChild(stackMetadata);
+}
+
+/**
+ * Attaches event listeners to stack action links
+ */
+function attachStackEventListeners() {
+  const stackLinks = document.querySelectorAll(".stack-info");
+
+  stackLinks.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const stackId = link.dataset.stackId;
+      const action = link.dataset.action;
+
+      if (!stackId || !action) return;
+
+      switch (action) {
+        case "showInputs":
+          showInputs(stackId);
+          break;
+        case "showOutputs":
+          showOutputs(stackId);
+          break;
+        case "confirmDelete":
+          confirmDeleteStack(stackId);
+          break;
+        case "goToConsole":
+          goToConsole(stackId);
+          break;
+      }
+    });
+  });
+}
+
+/**
+ * Confirms and deletes a stack
+ * @param {string} stackId - Stack ID to delete
+ */
+function confirmDeleteStack(stackId) {
+  const stack = allStacks[stackId];
+  const stackName = stack ? stack.StackName : stackId;
+
   if (confirm(`Are you sure you want to delete stack ${stackName}?`)) {
-    window.deleteStack(stackName, (err, data) => {
-      console.log(err, data);
+    window.deleteStack(stackId, (err, data) => {
+      if (err) {
+        console.error("Error deleting stack:", err);
+      } else {
+        console.log("Stack deletion initiated:", data);
+      }
     });
   }
 }
 
-function getFromKitMetadata(string) {
-  if (kitMetadata.hasOwnProperty(string)) {
-    return kitMetadata[string];
-  }
-  return null;
+/**
+ * Gets kit metadata by ID
+ * @param {string} kitId - Kit ID
+ * @returns {object|null} Kit metadata or null
+ */
+function getFromKitMetadata(kitId) {
+  if (!kitId) return null;
+  return kitMetadata && kitMetadata.hasOwnProperty(kitId) ? kitMetadata[kitId] : null;
 }
 
+/**
+ * Shows stack inputs in the metadata section
+ * @param {string} stackId - Stack ID
+ */
 function showInputs(stackId) {
   const stack = allStacks[stackId];
-  const inputs = stack.Parameters;
-  let filteredInputs = [];
-  for (let i = 0; i < inputs.length; i++) {
-    if (inputs[i]["ParameterKey"] !== "BootstrapVersion") {
-      filteredInputs.push(inputs[i]);
-    }
-  }
-  let localInputStore = localStorage.getItem(`${account}-${region}-${stack.StackName}`);
-  let localInputs = localInputStore && localInputStore.match(/^\[/) ? JSON.parse(localInputStore) : [];
-  let inputDiv = document.createElement("div");
+  if (!stack) return;
+
+  const inputs = stack.Parameters || [];
+  const filteredInputs = inputs.filter((param) => param.ParameterKey !== "BootstrapVersion");
+
+  // Get locally stored inputs
+  const localInputStore = localStorage.getItem(`${account}-${region}-${stack.StackName}`);
+  const localInputs = localInputStore && localInputStore.match(/^\[/) ? JSON.parse(localInputStore) : [];
+
+  const inputDiv = document.createElement("div");
+
   if (filteredInputs.length === 0 && localInputs.length === 0) {
-    let paramDiv = document.createElement("div");
-    paramDiv.innerText = `Stack had no inputs.`;
+    const paramDiv = document.createElement("div");
+    paramDiv.innerText = "Stack had no inputs.";
     inputDiv.appendChild(paramDiv);
   } else {
-    for (let i = 0; i < filteredInputs.length; i++) {
-      let paramDiv = document.createElement("div");
-      appendHtmlToNode(paramDiv, `<b>${filteredInputs[i]["ParameterKey"]}</b>: ${filteredInputs[i]["ParameterValue"]}`);
+    // Show CloudFormation inputs
+    filteredInputs.forEach((input) => {
+      const paramDiv = document.createElement("div");
+      appendHtmlToNode(paramDiv, `<b>${input.ParameterKey}</b>: ${input.ParameterValue}`);
       inputDiv.appendChild(paramDiv);
-    }
-    for (let i = 0; i < localInputs.length; i++) {
-      let paramDiv = document.createElement("div");
-      appendHtmlToNode(paramDiv, `<b>${localInputs[i]["ParameterKey"]}</b>: ${localInputs[i]["ParameterValue"]}`);
+    });
+
+    // Show local inputs
+    localInputs.forEach((input) => {
+      const paramDiv = document.createElement("div");
+      appendHtmlToNode(paramDiv, `<b>${input.ParameterKey}</b>: ${input.ParameterValue}`);
       inputDiv.appendChild(paramDiv);
-    }
+    });
   }
-  let parentNode = document.getElementById(`${stackId}-metadata`);
-  parentNode.innerText = "";
-  parentNode.appendChild(inputDiv);
+
+  const parentNode = document.getElementById(`${stackId}-metadata`);
+  if (parentNode) {
+    parentNode.innerText = "";
+    parentNode.appendChild(inputDiv);
+  }
 }
 
+/**
+ * Shows stack outputs in the metadata section
+ * @param {string} stackId - Stack ID
+ */
 function showOutputs(stackId) {
   const stack = allStacks[stackId];
-  const outputs = stack.Outputs;
-  let outputDiv = document.createElement("div");
+  if (!stack) return;
+
+  const outputs = stack.Outputs || [];
+  const outputDiv = document.createElement("div");
+
   if (outputs.length === 0) {
-    let paramDiv = document.createElement("div");
-    paramDiv.innerText = `Stack had no outputs.`;
+    const paramDiv = document.createElement("div");
+    paramDiv.innerText = "Stack had no outputs.";
     outputDiv.appendChild(paramDiv);
   } else {
-    for (let i = 0; i < outputs.length; i++) {
-      let paramDiv = document.createElement("div");
-      appendHtmlToNode(paramDiv, `<b>${outputs[i]["OutputKey"]}</b>: ${outputs[i]["OutputValue"]}`);
+    outputs.forEach((output) => {
+      const paramDiv = document.createElement("div");
+      appendHtmlToNode(paramDiv, `<b>${output.OutputKey}</b>: ${output.OutputValue}`);
       outputDiv.appendChild(paramDiv);
-    }
+    });
   }
-  let parentNode = document.getElementById(`${stackId}-metadata`);
-  parentNode.innerText = "";
-  parentNode.appendChild(outputDiv);
+
+  const parentNode = document.getElementById(`${stackId}-metadata`);
+  if (parentNode) {
+    parentNode.innerText = "";
+    parentNode.appendChild(outputDiv);
+  }
 }
 
-// function deleteStack(stackId) {
-//   openConsole(`https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/stackinfo?stackId=${stackId}`);
-//   // window.destroyStack(stackId, showStacksProgressFunc)
-// }
-
+/**
+ * Opens the CloudFormation console for a stack
+ * @param {string} stackId - Stack ID
+ */
 function goToConsole(stackId) {
-  openConsole(`https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/stackinfo?stackId=${stackId}`);
+  const consoleUrl = getConsoleUrl(region, stackId, "stackinfo");
+  if (consoleUrl) {
+    openConsole(consoleUrl);
+  }
 }
 
-//set all the variables back to empty state
+/**
+ * Resets all stack monitoring state
+ */
 function resetStackMonitoring() {
-  // cfMonitor = null;
-  clearInterval(cfMonitor);
-  clearInterval(longCfMonitor);
-  stackStates = {};
-  lastReportedStates = {};
-  stackEvents = {};
-  stackInfoRequestors = {};
-  stackOutputs = {};
-  debugMessages = {};
-  mostRecentEventTime = null;
+  stackMonitor.reset();
+
+  // Update legacy references
+  stackStates = stackMonitor.stackStates;
+  lastReportedStates = stackMonitor.lastReportedStates;
+  stackEvents = stackMonitor.stackEvents;
+  stackInfoRequestors = stackMonitor.stackInfoRequestors;
+  stackOutputs = stackMonitor.stackOutputs;
+  debugMessages = stackMonitor.debugMessages;
+  allStacks = stackMonitor.allStacks;
 }
 
+/**
+ * Main function to check stack progress
+ */
 function showStacksProgressFunc() {
   if (!window.loggedIn) {
     return;
   }
-  let stacks = window.getStacksInProgress();
-  // populateStackMonitorSelect();
+
+  const stacks = window.getStacksInProgress();
+
   if (Object.keys(stacks).length > 0) {
-    for (let stack in stacks) {
+    for (const stack in stacks) {
       if (stacks[stack].tracking) {
         console.log("checking stack progress for: " + stack);
         window.getStackEvents(stack, stackEventsResponseHandler);
@@ -584,215 +1109,203 @@ function showStacksProgressFunc() {
       }
     }
   }
-  // else {
-  // clearInterval(cfMonitor);
-  // in case we created something that the UI should learn about
-  // dispatchEvent(new Event('POST_STACK_UPDATE'));
-  // }
 }
 
-// the callback for processing the stack events
+/**
+ * Callback for processing stack events
+ * @param {string} stack - Stack name
+ * @param {object} stackStatus - Stack status object
+ * @param {Array} states - Array of resource states
+ */
 const stackEventsResponseHandler = function (stack, stackStatus, states) {
   console.log("stackEventsResponseHandler", stack, stackStatus, states);
-  let stacksInProgress = window.getStacksInProgress();
+
+  const stacksInProgress = window.getStacksInProgress();
+
   if (!stackStatus || !stackStatus.hasOwnProperty("Timestamp")) {
     window.getStackInfo(stack, (stackName, outputs) => {
       console.log(outputs);
+
       if (outputs && outputs.toString().match("does not exist")) {
         console.log("Stack does not exist, yet");
       } else if (stacksInProgress[stack].hasOwnProperty("updateRequested") && stacksInProgress[stack]["updateRequested"]) {
-        //this happens in updates
         console.log(`requesting an update to ${stack}`);
       } else if (outputs && outputs.hasOwnProperty("Stacks") && evaluateStatus(outputs.Stacks[0].StackStatus) === TASK_STATES.COMPLETE) {
         window.handleCompletedStack(stackName);
         unlockInstallButton(stacksInProgress[stack].kitId);
         registerProgress(stacksInProgress[stack].kitId, 100, `Kit has already been installed as <b>${stack}</b>.`);
-        dispatchEvent(new CustomEvent(TASK_EVENTS.DEPLOYMENT_COMPLETE, { detail: outputs.Stacks[0].StackName }));
+        dispatchEvent(
+          new CustomEvent(TASK_EVENTS.DEPLOYMENT_COMPLETE, {
+            detail: outputs.Stacks[0].StackName,
+          })
+        );
         stopMonitoring();
       }
     });
-  } else {
-    //check most recent event is not older than the monitoring timeout period
-    let latestEventTime = new Date(stackStatus.Timestamp).getTime();
-    if (!mostRecentEventTime) {
-      mostRecentEventTime = latestEventTime;
-    }
-    if (latestEventTime > mostRecentEventTime) {
-      mostRecentEventTime = latestEventTime;
-    }
-    for (let i = 0; i < states.length; i++) {
-      latestEventTime = new Date(states[i].Timestamp).getTime();
-      if (latestEventTime > mostRecentEventTime) {
-        mostRecentEventTime = latestEventTime;
-      }
-    }
-    if (!stackStates.hasOwnProperty(stack)) {
-      stackStates[stack] = {};
-    }
-    stackStates[stack] = stackStatus;
-    // check to see if the stack is complete
-    if (stackStatus && stackStatus.hasOwnProperty("ResourceStatus")) {
-      stacksInProgress[stack].status = stackStatus.ResourceStatus;
-      // if stack is complete, request stack info to retrieve outputs, if applicable
-      if (
-        evaluateStatus(stackStatus.ResourceStatus) === TASK_STATES.COMPLETE &&
-        stacksInProgress[stack].hasOutputs &&
-        !stackInfoRequestors.hasOwnProperty(stack)
-      ) {
-        stackInfoRequestors[stack] = setInterval(requestStackInfo, 3000, stack);
-      }
-      // else if (stackStatus.ResourceStatus.match(/(DELETE_COMPLETE|ROLLBACK_COMPLETE)/)) {
-      //   // we handle failed stacks in updateStackEventDisplay
-      // }
-    } else {
-      console.log(`stackStatus didn't have ResourceStatus`, stackStatus);
-    }
-    if (Object.keys(states).length > 0) {
-      stackEvents[stack] = states;
-    } else {
-      stackEvents[stack] = {};
-    }
-    updateStackEventDisplay(stacksInProgress);
+    return;
   }
+
+  // Update event times
+  stackMonitor.updateEventTime(stackStatus.Timestamp);
+
+  if (states && states.length > 0) {
+    states.forEach((state) => {
+      if (state.Timestamp) {
+        stackMonitor.updateEventTime(state.Timestamp);
+      }
+    });
+  }
+
+  // Update stack state
+  stackMonitor.setStackState(stack, stackStatus);
+  stackStates = stackMonitor.stackStates;
+
+  // Check if stack is complete
+  if (stackStatus && stackStatus.hasOwnProperty("ResourceStatus")) {
+    stacksInProgress[stack].status = stackStatus.ResourceStatus;
+
+    // If stack is complete and has outputs, request them
+    if (
+      evaluateStatus(stackStatus.ResourceStatus) === TASK_STATES.COMPLETE &&
+      stacksInProgress[stack].hasOutputs &&
+      !stackInfoRequestors.hasOwnProperty(stack)
+    ) {
+      stackMonitor.startStackInfoRequestor(stack, requestStackInfo);
+      stackInfoRequestors = stackMonitor.stackInfoRequestors;
+    }
+  } else {
+    console.log("stackStatus didn't have ResourceStatus", stackStatus);
+  }
+
+  // Update stack events
+  if (Object.keys(states).length > 0) {
+    stackMonitor.setStackEvents(stack, states);
+  } else {
+    stackMonitor.setStackEvents(stack, {});
+  }
+  stackEvents = stackMonitor.stackEvents;
+
+  updateStackEventDisplay(stacksInProgress);
 };
 
-// displays the stack events to the user
+/**
+ * Displays stack events to the user
+ * @param {object} stacks - Stacks in progress
+ */
 let eventOutput = {};
 let previousEventOutput = {};
+
 const updateStackEventDisplay = function (stacks) {
   let inProgressStacks = Object.keys(stacks).length;
+
+  // Initialize output tracking
   for (const thisStack in stackStates) {
     const kitId = stacks[thisStack].kitId;
-    // output is per kit not per stack
+
     if (!eventOutput.hasOwnProperty(kitId)) {
       eventOutput[kitId] = {};
     }
+
     eventOutput[kitId][thisStack] = "";
-    previousEventOutput[kitId] = document.getElementById(`${kitId}-cf-stack-states`).innerHTML;
+
+    const outputElement = document.getElementById(`${kitId}-cf-stack-states`);
+    if (outputElement) {
+      previousEventOutput[kitId] = outputElement.innerHTML;
+    }
   }
+
+  // Build output for each stack
   for (const thisStack in stackStates) {
     const kitId = stacks[thisStack].kitId;
+    const stackState = stackStates[thisStack];
+    const resourceTotal = Number(stacks[thisStack].resourceCount);
+    const resourceComplete = Object.keys(stackEvents[thisStack] || {}).length;
 
-    let region = document.getElementById("region-select").value;
-    const console_link = ` <a onclick="openConsole('https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/stackinfo?stackId=${stackStates[thisStack].StackId}')">View in Console</a><br>`;
-
-    if (Object.keys(stackStates).length === 0) {
-      eventOutput[kitId][thisStack] += bouncyBox;
-    }
+    // Calculate progress
     let pcComplete = 50;
-    let resourceTotal = Number(stacks[thisStack].resourceCount);
-    let resourceComplete = Object.keys(stackEvents[thisStack]).length;
-    if (resourceComplete > resourceTotal) {
-      resourceTotal = resourceComplete;
-    }
     if (resourceTotal > 0 && resourceComplete > -1) {
-      pcComplete = (resourceComplete / resourceTotal) * 100;
+      pcComplete = (resourceComplete / Math.max(resourceTotal, resourceComplete)) * 100;
     }
 
-    eventOutput[kitId][thisStack] += `<b>` + thisStack + "</b>: ";
-    /*
-     * NB stackStates only contains the status of the stack itself.
-     *
-     * here we are checking if there has been a status _change_
-     * eg, if it's moved from in progress to completed states
-     * and we need to do something as a consequence
-     */
+    // Build stack header
+    eventOutput[kitId][thisStack] += `<b>${thisStack}</b>: `;
 
-    if (lastReportedStates[thisStack] !== stackStates[thisStack].ResourceStatus) {
+    // Generate console link
+    const consoleLink = ` <a onclick="openConsole('${getConsoleUrl(region, stackState.StackId)}')">View in Console</a><br>`;
+
+    // Check if state changed
+    if (stackMonitor.hasStateChanged(thisStack, stackState.ResourceStatus)) {
       phoneHome({
         csk_id: window.resellerConfig.csk_id,
         kit_id: kitId,
-        stack_status: stackStates[thisStack].ResourceStatus,
+        stack_status: stackState.ResourceStatus,
         stack_name: thisStack,
-        details: stackStates[thisStack],
+        details: stackState,
       });
-      // handles CREATE and UPDATE
-      eventOutput[kitId][thisStack] += labelStatus(stackStates[thisStack].ResourceStatus);
-      eventOutput[kitId][thisStack] += console_link;
-      if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.COMPLETE) {
+
+      eventOutput[kitId][thisStack] += labelStatus(stackState.ResourceStatus);
+      eventOutput[kitId][thisStack] += consoleLink;
+
+      // Handle state transitions
+      const state = evaluateStatus(stackState.ResourceStatus);
+
+      if (state === TASK_STATES.COMPLETE) {
         console.log(` **** marking ${thisStack} complete from updateStackEventDisplay *** `);
         registerProgress(kitId, 100, "Deployment complete");
         dispatchEvent(new CustomEvent(TASK_EVENTS.DEPLOYMENT_COMPLETE, { detail: thisStack }));
         dispatchEvent(new Event("POST_STACK_UPDATE"));
         window.handleCompletedStack(thisStack);
         unlockInstallButton(kitId);
-        inProgressStacks = --inProgressStacks;
-      } else if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.FAILED) {
+        inProgressStacks--;
+      } else if (state === TASK_STATES.FAILED) {
         console.log(` **** marking ${thisStack} FAILED from updateStackEventDisplay *** `);
         registerProgress(kitId, 1, "Stack is in failed state and may need to be deleted via the console");
         dispatchEvent(new CustomEvent(TASK_EVENTS.DEPLOYMENT_FAILED, { detail: thisStack }));
         window.handleFailedStack(thisStack);
         unlockInstallButton(kitId);
-        inProgressStacks = --inProgressStacks;
-      } else if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.FAILED_NEEDS_DELETION) {
+        inProgressStacks--;
+      } else if (state === TASK_STATES.FAILED_NEEDS_DELETION) {
         console.log(` **** marking ${thisStack} FAILED/ROLLED BACK from updateStackEventDisplay *** `);
         registerProgress(kitId, 100, "Stack is in failed state and should be deleted via the console");
         dispatchEvent(new CustomEvent(TASK_EVENTS.DEPLOYMENT_FAILED, { detail: thisStack }));
         window.handleFailedStack(thisStack);
         unlockInstallButton(kitId);
-        inProgressStacks = --inProgressStacks;
-      } else if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.DELETED) {
+        inProgressStacks--;
+      } else if (state === TASK_STATES.DELETED) {
         registerProgress(kitId, 1, "Stack has been deleted");
         dispatchEvent(new CustomEvent(TASK_EVENTS.DEPLOYMENT_FAILED, { detail: thisStack }));
         window.handleFailedStack(thisStack);
         unlockInstallButton(kitId);
-        inProgressStacks = --inProgressStacks;
+        inProgressStacks--;
       } else {
-        console.log(`${thisStack} state is ${stackStates[thisStack].ResourceStatus}`);
+        console.log(`${thisStack} state is ${stackState.ResourceStatus}`);
         registerProgress(kitId, pcComplete);
         window.keepWatchingStack(thisStack);
       }
-      lastReportedStates[thisStack] = stackStates[thisStack].ResourceStatus;
+
+      stackMonitor.updateLastReportedState(thisStack, stackState.ResourceStatus);
+      lastReportedStates = stackMonitor.lastReportedStates;
     } else {
-      /*
-       * if the status hasn't changed we still need to register this stack's status
-       */
-      if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.COMPLETE) {
-        inProgressStacks = --inProgressStacks;
-        registerProgress(kitId, 100);
-      } else if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.DELETED) {
-        inProgressStacks = --inProgressStacks;
-        registerProgress(kitId, 100);
-      } else if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.FAILED) {
-        inProgressStacks = --inProgressStacks;
-        registerProgress(kitId, 1);
-      } else if (evaluateStatus(stackStates[thisStack].ResourceStatus) === TASK_STATES.FAILED_NEEDS_DELETION) {
-        inProgressStacks = --inProgressStacks;
-        registerProgress(kitId, 1);
+      // Status hasn't changed, still need to register progress
+      const state = evaluateStatus(stackState.ResourceStatus);
+
+      if (isTerminalStatus(stackState.ResourceStatus)) {
+        inProgressStacks--;
+        registerProgress(kitId, state === TASK_STATES.COMPLETE ? 100 : 1);
       } else {
-        // it's still in progress
         registerProgress(kitId, pcComplete);
       }
-      eventOutput[kitId][thisStack] += labelStatus(stackStates[thisStack].ResourceStatus);
-      eventOutput[kitId][thisStack] += console_link;
+
+      eventOutput[kitId][thisStack] += labelStatus(stackState.ResourceStatus);
+      eventOutput[kitId][thisStack] += consoleLink;
     }
 
-    /*
-     * stackEvents contains the status of the stack's resources.
-     * here, we print them out to the UI
-     */
-    let resourceOutput = "";
-    let vpcCreated = false;
-    let resourceLink = `<a onclick="openConsole('https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/resources?stackId=${stackStates[thisStack].StackId}')">`;
-    if (Object.keys(stackEvents[thisStack]).length > 0) {
-      for (const resourceId in stackEvents[thisStack]) {
-        let shortenedResourceId = resourceId.replace(thisStack.replace(/-stack/, "").replace(/-/g, ""), "");
-        resourceOutput += `├─ <b>${
-          stackEvents[thisStack][resourceId].ResourceType
-        }</b> ${resourceLink}<div class="inline-truncated">${shortenedResourceId}</div></a> ${labelStatus(
-          stackEvents[thisStack][resourceId].ResourceStatus
-        )}<br>`;
-        if (stackEvents[thisStack][resourceId].ResourceType === "AWS::EC2::VPC") {
-          vpcCreated = true;
-        }
-      }
-    } else {
-      resourceOutput += `├─ No resources found`;
-    }
-    eventOutput[kitId][thisStack] += resourceOutput;
+    // Add resource output
+    eventOutput[kitId][thisStack] += buildResourceOutput(thisStack, stackState.StackId);
   }
-  //concatenate the stack info
-  let kitOutputs = {};
+
+  // Concatenate and display output
+  const kitOutputs = {};
   for (const thisStack in stackStates) {
     const kitId = stacks[thisStack].kitId;
     if (!kitOutputs.hasOwnProperty(kitId)) {
@@ -801,215 +1314,392 @@ const updateStackEventDisplay = function (stacks) {
     kitOutputs[kitId] += eventOutput[kitId][thisStack];
   }
 
-  // set the content to the new content if it's changed
+  // Update UI if content changed
   for (const kitId in kitOutputs) {
     if (previousEventOutput[kitId] !== kitOutputs[kitId]) {
-      // document.getElementById(`${kitId}-cf-stack-states`).innerHTML = kitOutputs[kitId];
-      appendHtmlToNode(document.getElementById(`${kitId}-cf-stack-states`), kitOutputs[kitId]);
+      const element = document.getElementById(`${kitId}-cf-stack-states`);
+      if (element) {
+        appendHtmlToNode(element, kitOutputs[kitId]);
+      }
     }
   }
 
   if (inProgressStacks <= 0) {
     console.info("ALL STACKS DONE");
-    inProgressStacks = 0;
   } else {
     console.info(`${inProgressStacks} stacks left to complete`);
   }
 };
 
-function unlockInstallButton(kitId) {
-  console.log("unlocking install button");
-  document.getElementById(`${kitId}-install-button`).disabled = false;
+/**
+ * Builds resource output HTML for a stack
+ * @param {string} stackName - Stack name
+ * @param {string} stackId - Stack ID
+ * @returns {string} HTML string
+ */
+function buildResourceOutput(stackName, stackId) {
+  const events = stackEvents[stackName] || {};
+  const resourceLink = `<a onclick="openConsole('${getConsoleUrl(region, stackId, "resources")}')">`;
+  let output = "";
+
+  if (Object.keys(events).length > 0) {
+    for (const resourceId in events) {
+      const resource = events[resourceId];
+      const shortenedId = resourceId.replace(stackName.replace(/-stack/, "").replace(/-/g, ""), "");
+
+      output += `├─ <b>${resource.ResourceType}</b> ${resourceLink}<div class="inline-truncated">${shortenedId}</div></a> ${labelStatus(resource.ResourceStatus)}<br>`;
+    }
+  } else {
+    output += "├─ No resources found";
+  }
+
+  return output;
 }
 
-// requests the cfn outputs
+/**
+ * Unlocks the install button for a kit
+ * @param {string} kitId - Kit ID
+ */
+function unlockInstallButton(kitId) {
+  console.log("unlocking install button");
+  const button = document.getElementById(`${kitId}-install-button`);
+  if (button) {
+    button.disabled = false;
+  }
+}
+
+/**
+ * Requests stack info (outputs)
+ * @param {string} stack - Stack name
+ */
 const requestStackInfo = function (stack) {
   console.log("Getting outputs for " + stack);
   window.getStackInfo(stack, outputsResponseHandler);
 };
 
-// callback for the outputs retrieval function
+/**
+ * Callback for outputs retrieval
+ * @param {string} stack - Stack name
+ * @param {object} outputs - Outputs object
+ */
 const outputsResponseHandler = function (stack, outputs) {
-  // console.log("outputsResponseHandler for " + stack + ": " + JSON.stringify(outputs))
   if (outputs.hasOwnProperty("Stacks") && outputs.Stacks[0].Outputs.length > 0) {
-    //we have the outputs so kill off the requestor
-    clearInterval(stackInfoRequestors[outputs.Stacks[0].StackName]);
-    stackOutputs[outputs.Stacks[0].StackName] = outputs.Stacks[0].Outputs;
+    // We have the outputs, stop requesting
+    stackMonitor.stopStackInfoRequestor(outputs.Stacks[0].StackName);
+    stackMonitor.setStackOutputs(outputs.Stacks[0].StackName, outputs.Stacks[0].Outputs);
+
+    // Update legacy references
+    stackInfoRequestors = stackMonitor.stackInfoRequestors;
+    stackOutputs = stackMonitor.stackOutputs;
+
     showCfnOutputs(outputs.Stacks[0].StackName);
   }
 };
 
-// display all the CFN outputs
+/**
+ * Displays CloudFormation outputs
+ * @param {string} stack - Stack name
+ */
 let htmlCfnOutputs = {};
+
 const showCfnOutputs = function (stack) {
-  let stacks = window.getStacksInProgress();
+  const stacks = window.getStacksInProgress();
   const kitId = stacks[stack].kitId;
-  let cfOutDiv = document.getElementById(`${kitId}-cf-stack-outputs`);
-  for (let stk in stackOutputs) {
-    if (!htmlCfnOutputs.hasOwnProperty(kitId)) {
-      htmlCfnOutputs[kitId] = "";
-    }
-    htmlCfnOutputs[kitId] += "<b>" + stk + ":</b><br/>";
-    for (let i = 0; i < stackOutputs[stk].length; i++) {
-      htmlCfnOutputs[kitId] += "<b>" + stackOutputs[stk][i].OutputKey + "</b>: " + stackOutputs[stk][i].OutputValue + "<br>";
-    }
+  const cfOutDiv = document.getElementById(`${kitId}-cf-stack-outputs`);
+
+  if (!cfOutDiv) return;
+
+  const outputs = stackMonitor.getStackOutputs(stack);
+
+  if (!htmlCfnOutputs.hasOwnProperty(kitId)) {
+    htmlCfnOutputs[kitId] = "";
   }
-  // cfOutDiv.innerHTML = htmlCfnOutputs[kitId];
+
+  htmlCfnOutputs[kitId] += `<b>${stack}:</b><br/>`;
+
+  outputs.forEach((output) => {
+    htmlCfnOutputs[kitId] += `<b>${output.OutputKey}</b>: ${output.OutputValue}<br>`;
+  });
+
   appendHtmlToNode(cfOutDiv, htmlCfnOutputs[kitId]);
 };
 
-// handles the response from the request to deploy the stack
+/**
+ * Handles the response from stack deployment request
+ * @param {Error|string} failure - Failure message or error
+ * @param {object} success - Success response
+ * @param {string} stackName - Stack name
+ */
 const deployResponseHandler = function (failure, success, stackName) {
   console.log("callback from deploy request", stackName, success, failure);
-  let stacks = window.getStacksInProgress();
+
+  const stacks = window.getStacksInProgress();
+
   if (failure) {
-    if (failure.toString().match(/Stack \[([A-Za-z0-9-]+)\] already exists/)) {
-      stackName = failure.toString().match(/Stack \[([A-Za-z0-9-]+)\] already exists/)[1];
-      stopMonitoring();
-      registerProgress(stacks[stackName].kitId, 1, failure.toString());
-      unlockInstallButton(stacks[stackName].kitId);
-    } else {
-      stopMonitoring();
-      registerProgress(stacks[stackName].kitId, 1, failure.toString());
-      unlockInstallButton(stacks[stackName].kitId);
-    }
+    handleDeploymentFailure(failure, stackName, stacks);
+  } else if (success) {
+    handleDeploymentSuccess(success, stackName, stacks);
   }
 
+  // Check if region controls can be unlocked
   const checker = setInterval(() => {
     if (regionControlsCanBeUnlocked()) {
       lockRegionControls(false);
       clearInterval(checker);
     }
   }, 3000);
+
+  // Display debug messages
+  displayDebugMessages(stacks);
+};
+
+/**
+ * Handles deployment failure
+ * @param {Error|string} failure - Failure message
+ * @param {string} stackName - Stack name
+ * @param {object} stacks - Stacks in progress
+ */
+function handleDeploymentFailure(failure, stackName, stacks) {
+  // Extract stack name from error if not provided
   if (!stackName) {
-    if (success && success.hasOwnProperty("StackId")) {
-      stackName = success.StackId.split("/")[1];
-    } else if (failure && failure.hasOwnProperty("StackId")) {
+    if (failure.hasOwnProperty("StackId")) {
       stackName = failure.StackId.split("/")[1];
-    } else if (failure && failure.toString().match(/Stack \[([A-Za-z0-9-]+)\] already exists/)) {
+    } else if (failure.toString().match(/Stack \[([A-Za-z0-9-]+)\] already exists/)) {
       stackName = failure.toString().match(/Stack \[([A-Za-z0-9-]+)\] already exists/)[1];
     } else {
       stackName = "Unknown";
     }
   }
 
-  if (failure && stackName !== "Unknown") {
-    if (typeof failure === "object") {
-      failure = failure.toString();
-    }
-    if (failure.match(/credentials/i)) {
-      //got logged out
-      displayCredentialErrors(true, failure);
-      resetUi();
-      registerProgress(stacks[stackName].kitId, 1, failure);
-      window.handleFailedStack(stackName);
-    } else {
-      debugMessages[stackName] = failure;
-      phoneHome({ csk_id: window.resellerConfig.csk_id, kit_id: stacks[stackName].kitId, stack_status: "failed", stack_name: stackName, details: failure });
-      registerProgress(stacks[stackName].kitId, 1, failure);
-      window.handleFailedStack(stackName);
-    }
-  } else if (failure && stackName === "Unknown") {
+  if (stackName === "Unknown") {
     console.error("Failure with no stack name");
-  } else if (success) {
-    debugMessages[stackName] = success;
+    return;
+  }
+
+  // Handle stack already exists
+  if (failure.toString().match(/Stack \[([A-Za-z0-9-]+)\] already exists/)) {
+    stopMonitoring();
+    registerProgress(stacks[stackName].kitId, 1, failure.toString());
+    unlockInstallButton(stacks[stackName].kitId);
+    return;
+  }
+
+  const failureStr = typeof failure === "object" ? failure.toString() : failure;
+
+  // Handle credential errors
+  if (failureStr.match(/credentials/i)) {
+    displayCredentialErrors(true, failureStr);
+    resetUi();
+    registerProgress(stacks[stackName].kitId, 1, failureStr);
+    window.handleFailedStack(stackName);
+  } else {
+    stackMonitor.setDebugMessage(stackName, failureStr);
+    debugMessages = stackMonitor.getAllDebugMessages();
+
+    phoneHome({
+      csk_id: window.resellerConfig.csk_id,
+      kit_id: stacks[stackName].kitId,
+      stack_status: "failed",
+      stack_name: stackName,
+      details: failureStr,
+    });
+
+    registerProgress(stacks[stackName].kitId, 1, failureStr);
+    window.handleFailedStack(stackName);
+  }
+}
+
+/**
+ * Handles deployment success
+ * @param {object} success - Success response
+ * @param {string} stackName - Stack name
+ * @param {object} stacks - Stacks in progress
+ */
+function handleDeploymentSuccess(success, stackName, stacks) {
+  // Extract stack name if not provided
+  if (!stackName && success.hasOwnProperty("StackId")) {
+    stackName = success.StackId.split("/")[1];
+  }
+
+  stackMonitor.setDebugMessage(stackName, success);
+  debugMessages = stackMonitor.getAllDebugMessages();
+
+  // Handle different success types
+  if (success.hasOwnProperty("noOp") && success.noOp === true) {
+    // Stack already deployed
+    console.log(` **** marking ${stackName} complete from deployResponseHandler *** `, success);
+    phoneHome({
+      csk_id: window.resellerConfig.csk_id,
+      kit_id: stacks[stackName].kitId,
+      stack_status: "success",
+      stack_name: stackName,
+      details: success,
+    });
+    registerProgress(stacks[stackName].kitId, 100, `${stackName} already deployed`);
+    window.handleCompletedStack(stackName);
+  } else if (success.hasOwnProperty("pipelineExecutionId")) {
+    // Pipeline deployment
+    addToTaskQueue(new Task(Task.TYPES.KIT_DEPLOYMENT, stackName));
+    lockRegionControls(true);
+    registerProgress(stacks[stackName].kitId, 1, "Kit uploaded successfully, starting pipeline...please wait");
+
+    const pipelineName = getValueInNamespace(`${account}-${region}`, "PipelineName");
+    const url = getPipelineConsoleUrl(region, pipelineName, success.pipelineExecutionId);
+
+    stackMonitor.setDebugMessage(stackName, `Deploying via pipeline: <a onclick="openConsole('${url}')">View in Console</a>`);
+    debugMessages = stackMonitor.getAllDebugMessages();
+
+    monitorPipeline(stacks[stackName].kitId, stackName, success.pipelineExecutionId, pipelineName);
+  } else if (success.hasOwnProperty("Location")) {
+    // S3 upload deployment
+    addToTaskQueue(new Task(Task.TYPES.KIT_DEPLOYMENT, stackName));
+    lockRegionControls(true);
+    registerProgress(stacks[stackName].kitId, 1, "Kit uploaded successfully, starting deployment pipeline...");
+
+    stackMonitor.setDebugMessage(
+      stackName,
+      `Deploying via pipeline: <a onclick="openConsole('https://${region}.console.aws.amazon.com/codesuite/codepipeline/pipelines')">View in Console</a>`
+    );
+    debugMessages = stackMonitor.getAllDebugMessages();
+  } else {
+    // Standard deployment
     addToTaskQueue(new Task(Task.TYPES.KIT_DEPLOYMENT, stackName));
     lockRegionControls(true);
     registerProgress(stacks[stackName].kitId, 1, "Kit uploaded successfully, starting deployment...please wait");
-    if (success.hasOwnProperty("Location")) {
-      registerProgress(stacks[stackName].kitId, 1, "Kit uploaded successfully, starting deployment pipeline...");
-      debugMessages[
-        stackName
-      ] = `Deploying via pipeline: <a onclick="openConsole('https://${region}.console.aws.amazon.com/codesuite/codepipeline/pipelines')">View in Console</a>`;
-    } else if (success.hasOwnProperty("pipelineExecutionId")) {
-      registerProgress(stacks[stackName].kitId, 1, "Kit uploaded successfully, starting pipeline...please wait");
-      let pipelineName = getValueInNamespace(`${account}-${region}`, "PipelineName");
-      let url = `https://${region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${pipelineName}/executions/${success["pipelineExecutionId"]}/visualization?region=${region}`;
-      debugMessages[stackName] = `Deploying via pipeline: <a onclick="openConsole('${url}')">View in Console</a>`;
-      monitorPipeline(stacks[stackName].kitId, stackName, success["pipelineExecutionId"], pipelineName);
-    } else if (success.hasOwnProperty("noOp") && success.noOp === true) {
-      console.log(` **** marking ${stackName} complete from deployResponseHandler *** `, success);
-      phoneHome({ csk_id: window.resellerConfig.csk_id, kit_id: stacks[stackName].kitId, stack_status: "success", stack_name: stackName, details: success });
-      registerProgress(stacks[stackName].kitId, 100, `${stackName} already deployed`);
-      window.handleCompletedStack(stackName);
-    }
   }
-  let kitResponses = {};
-  for (let stack in debugMessages) {
+}
+
+/**
+ * Displays debug messages for all stacks
+ * @param {object} stacks - Stacks in progress
+ */
+function displayDebugMessages(stacks) {
+  const kitResponses = {};
+  const allDebugMessages = stackMonitor.getAllDebugMessages();
+
+  // Group messages by kit
+  for (const stack in allDebugMessages) {
     const kitId = stacks[stack].kitId;
     if (!kitResponses.hasOwnProperty(kitId)) {
       kitResponses[kitId] = {};
     }
   }
-  for (let stack in debugMessages) {
+
+  // Format messages
+  for (const stack in allDebugMessages) {
     const kitId = stacks[stack].kitId;
+    const message = allDebugMessages[stack];
+
     kitResponses[kitId][stack] = "";
-    if (typeof debugMessages[stack] === "object") {
-      kitResponses[kitId][stack] += `<b>${stack}</b>: ` + JSON.stringify(debugMessages[stack], null, 4) + "<br>";
-    } else if (success) {
-      kitResponses[kitId][stack] += `<b>${stack}</b>:  <span class="success">` + debugMessages[stack] + "</span><br>";
+
+    if (typeof message === "object") {
+      kitResponses[kitId][stack] += `<b>${stack}</b>: ${JSON.stringify(message, null, 4)}<br>`;
     } else {
-      kitResponses[kitId][stack] += `<b>${stack}</b>:  <span class="error">` + debugMessages[stack] + "</span><br>";
+      const cssClass = message.match(/failed|error/i) ? "error" : "success";
+      kitResponses[kitId][stack] += `<b>${stack}</b>: <span class="${cssClass}">${message}</span><br>`;
     }
   }
-  //concatenate the stack info
-  let cfnResponseOutputs = {};
+
+  // Concatenate and display
+  const cfnResponseOutputs = {};
   for (const kitId in kitResponses) {
     cfnResponseOutputs[kitId] = "";
     for (const stack in kitResponses[kitId]) {
       cfnResponseOutputs[kitId] += kitResponses[kitId][stack];
     }
-    // document.getElementById(`${kitId}-deploystack-output`).innerHTML = cfnResponseOutputs[kitId];
-    appendHtmlToNode(document.getElementById(`${kitId}-deploystack-output`), cfnResponseOutputs[kitId]);
-  }
-};
 
+    const outputElement = document.getElementById(`${kitId}-deploystack-output`);
+    if (outputElement) {
+      appendHtmlToNode(outputElement, cfnResponseOutputs[kitId]);
+    }
+  }
+}
+
+/**
+ * Monitors pipeline execution status
+ * @param {string} kitId - Kit ID
+ * @param {string} stackName - Stack name
+ * @param {string} execId - Execution ID
+ * @param {string} pipelineName - Pipeline name
+ */
 function monitorPipeline(kitId, stackName, execId, pipelineName) {
   const checker = setInterval(() => {
     window.getPipelineStatus(execId, (err, data) => {
-      console.log(data);
-      if (data.hasOwnProperty("pipelineExecution") && data.pipelineExecution.hasOwnProperty("status")) {
-        let url = `https://${region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${pipelineName}/executions/${execId}/visualization?region=${region}`;
-        let output = `<span class="success"><b>Pipeline Status:</b> ${labelStatus(data.pipelineExecution.status).replace(
-          /([a-z0-9])([A-Z])/g,
-          "$1 $2"
-        )}&nbsp;&nbsp;&nbsp;<a onclick="openConsole('${url}')">View in Console</a></span><br>`;
-        appendHtmlToNode(document.getElementById(`${kitId}-deploystack-output`), output);
-        if (data.pipelineExecution.status === "Succeeded") {
-          clearInterval(checker);
-          unlockInstallButton(kitId);
-          registerProgress(kitId, 100, `${stackName} deployed successfully`);
-          window.handleCompletedStack(stackName);
-        } else if (data.pipelineExecution.status === "Failed" || err) {
-          clearInterval(checker);
-          unlockInstallButton(kitId);
-          registerProgress(kitId, 1, `Failed to deploy ${stackName} - check the console for more information`);
-          window.handleFailedStack(stackName);
-        } else {
-          updateProgressBarMessage(kitId, `${stackName} deployment: ${data.pipelineExecution.status.replace(/([a-z0-9])([A-Z])/g, "$1 $2")}`);
-        }
-      } else if (err) {
+      if (err) {
         console.log(err);
         clearInterval(checker);
         unlockInstallButton(kitId);
-        registerProgress(kitId, 1, `Pipeline failed - check the console for more information`);
+        registerProgress(kitId, 1, "Pipeline failed - check the console for more information");
         window.handleFailedStack(stackName);
+        return;
+      }
+
+      if (!data.hasOwnProperty("pipelineExecution") || !data.pipelineExecution.hasOwnProperty("status")) {
+        return;
+      }
+
+      const status = data.pipelineExecution.status;
+      const url = getPipelineConsoleUrl(region, pipelineName, execId);
+      const statusLabel = labelStatus(status).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+
+      const output = `<span class="success"><b>Pipeline Status:</b> ${statusLabel}&nbsp;&nbsp;&nbsp;<a onclick="openConsole('${url}')">View in Console</a></span><br>`;
+
+      const outputElement = document.getElementById(`${kitId}-deploystack-output`);
+      if (outputElement) {
+        appendHtmlToNode(outputElement, output);
+      }
+
+      if (status === "Succeeded") {
+        clearInterval(checker);
+        unlockInstallButton(kitId);
+        registerProgress(kitId, 100, `${stackName} deployed successfully`);
+        window.handleCompletedStack(stackName);
+      } else if (status === "Failed") {
+        clearInterval(checker);
+        unlockInstallButton(kitId);
+        registerProgress(kitId, 1, `Failed to deploy ${stackName} - check the console for more information`);
+        window.handleFailedStack(stackName);
+      } else {
+        updateProgressBarMessage(kitId, `${stackName} deployment: ${status.replace(/([a-z0-9])([A-Z])/g, "$1 $2")}`);
       }
     });
   }, 5000);
 }
 
+/**
+ * Resets all kit monitors
+ */
 function resetAllKitMonitors() {
   console.log("resetting all kit monitors");
+
   for (const kitId in kitMetadata) {
     try {
       registerProgress(kitId, 1);
-      appendHtmlToNode(document.getElementById(`${kitId}-deploystack-output`), "");
-      appendHtmlToNode(document.getElementById(`${kitId}-cf-stack-states`), "");
-      appendHtmlToNode(document.getElementById(`${kitId}-cf-stack-outputs`), "");
-      document.getElementById(`${kitId}-install-button`).disabled = false;
-      document.getElementById(`${kitId}-deployment-progress`).style.display = "none";
-      document.getElementById(`${kitId}-deployment-details`).style.display = "none";
+
+      const elements = [`${kitId}-deploystack-output`, `${kitId}-cf-stack-states`, `${kitId}-cf-stack-outputs`];
+
+      elements.forEach((elementId) => {
+        const element = document.getElementById(elementId);
+        if (element) {
+          appendHtmlToNode(element, "");
+        }
+      });
+
+      const installButton = document.getElementById(`${kitId}-install-button`);
+      if (installButton) {
+        installButton.disabled = false;
+      }
+
+      const progressElement = document.getElementById(`${kitId}-deployment-progress`);
+      if (progressElement) {
+        progressElement.style.display = "none";
+      }
+
+      const detailsElement = document.getElementById(`${kitId}-deployment-details`);
+      if (detailsElement) {
+        detailsElement.style.display = "none";
+      }
+
       hideConfigForKit(kitId);
     } catch (e) {
       console.error(e);
@@ -1017,9 +1707,18 @@ function resetAllKitMonitors() {
   }
 }
 
+/**
+ * Registers progress for a kit
+ * @param {string} kitId - Kit ID
+ * @param {number} value - Progress value (0-100)
+ * @param {string} message - Optional message
+ */
 function registerProgress(kitId, value, message = "") {
+  if (!progressBars || !progressBars[kitId]) return;
+
   progressBars[kitId][1].style.width = `${Math.floor(value)}%`;
   progressBars[kitId][0].textContent = `${Math.floor(value)}%`;
+
   if (value === 1 || value === 100) {
     if (message) {
       updateProgressBarMessage(kitId, message);
@@ -1031,62 +1730,54 @@ function registerProgress(kitId, value, message = "") {
   }
 }
 
+/**
+ * Updates progress bar message
+ * @param {string} kitId - Kit ID
+ * @param {string} message - Message to display
+ */
 function updateProgressBarMessage(kitId, message) {
-  if (message) {
+  if (message && progressBars && progressBars[kitId]) {
     progressBars[kitId][2].textContent = message;
   }
 }
 
+/**
+ * Starts monitoring
+ */
 function startMonitoring() {
-  console.log(`monitoring starting in ${preMonitoringDelay}s`);
-  setTimeout(() => {
-    cfMonitor = setInterval(showStacksProgressFunc, 3000);
-  }, preMonitoringDelay * 1000);
-  longCfMonitor = setTimeout(monitoringChecker, monitoringTimeout * 1000);
+  stackMonitor.startMonitoring();
 }
 
+/**
+ * Stops monitoring
+ */
 function stopMonitoring() {
-  console.log("monitoring STOPPED");
-  clearInterval(cfMonitor);
-  clearInterval(longCfMonitor);
+  stackMonitor.stopMonitoring();
 }
 
-function monitoringChecker() {
-  const timeNow = new Date().getTime();
-  if (timeNow - mostRecentEventTime > monitoringTimeout * 1000) {
-    displayErrors(
-      `Monitoring timeout reached - ${monitoringTimeout}s has passed with no new events. Check the status of your stacks in the CloudFormation console.`
-    );
-    stopMonitoring();
-  } else {
-    setTimeout(monitoringChecker, 3000);
-  }
+/**
+ * Handles monitoring timeout
+ * @param {number} timeout - Timeout value in seconds
+ */
+function handleMonitoringTimeout(timeout) {
+  displayErrors(
+    `Monitoring timeout reached - ${timeout}s has passed with no new events. Check the status of your stacks in the CloudFormation console.`
+  );
 }
 
+/**
+ * Clears a specific stack monitor
+ * @param {string} stackName - Stack name
+ */
 function clearStackMonitor(stackName) {
   window.clearTrackedStacks(stackName);
 }
 
+/**
+ * Clears all stack monitors
+ */
 function clearStackMonitors() {
   window.clearTrackedStacks();
-}
-
-function labelStatus(status) {
-  let labelledStatus = "";
-  if (evaluateStatus(status) === TASK_STATES.COMPLETE) {
-    labelledStatus = `${status}  ✅`;
-  } else if (evaluateStatus(status) === TASK_STATES.FAILED) {
-    labelledStatus = `${status}  ❌`;
-  } else if (evaluateStatus(status) === TASK_STATES.FAILED_NEEDS_DELETION) {
-    labelledStatus = `${status}  ❌`;
-  } else if (evaluateStatus(status) === TASK_STATES.DELETED) {
-    labelledStatus = `${status}  ❌`;
-  } else if (evaluateStatus(status) === TASK_STATES.DELETE_FAILED) {
-    labelledStatus = `${status}  ❌`;
-  } else {
-    labelledStatus = `${status}  ${bouncyBox}`;
-  }
-  return labelledStatus;
 }
 
 
@@ -2307,6 +2998,10 @@ document.getElementById("execute-sdk-button").addEventListener("click", runSdkCo
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
+// Import modules - Note: In browser context, these would need to be bundled
+// For now, we'll make them available via window object from a separate script
+// or use a bundler like webpack/rollup
+
 let region = null;
 let account = null;
 let progressBars = {};
@@ -2319,6 +3014,11 @@ let defaultCategory = null;
 
 document.documentElement.setAttribute("data-theme", "light");
 const decoder = new TextDecoder();
+
+// Storage helper functions are defined in utilities.js (concatenated before this file)
+// getValueInNamespace and setValueInNamespace are already available globally
+
+// appendHtmlToNode is defined in utilities.js (concatenated before this file)
 
 async function checkForKey() {
   let existingConfig = localStorage.getItem("kitConfig");
@@ -2566,7 +3266,7 @@ let kitConfigsShowing = {};
 function configureKit(kitId) {
   let kit = kitMetadata[kitId];
   kitConfigsShowing[kitId] = true;
-  console.log(`configuring ${kit.kitId}`);
+  console.log(`configuring ${kit.kitId || kitId}`);
   if (kit.hasOwnProperty("Templates")) {
     //cfn kit
     displayTemplateConfig(kitId);
@@ -2678,35 +3378,57 @@ function destroySamApp(kitId) {
 }
 
 function showCategory(catId) {
-  let cat = document.getElementById(catId);
+  const cat = document.getElementById(catId);
+  if (!cat) return;
+
   cat.style.display = "block";
-  for (let sibling of cat.parentNode.children) {
+
+  // Hide siblings
+  for (const sibling of cat.parentNode.children) {
     if (sibling !== cat) {
       sibling.style.display = "none";
     }
   }
-  let catMenuItem = document.getElementById(`${catId}-selector`);
-  catMenuItem.classList.add("category-selector-selected");
-  let catMenuBar = document.getElementById("kit-category-selector");
-  for (let sibling of catMenuBar.children) {
-    if (sibling !== catMenuItem) {
-      sibling.classList.remove("category-selector-selected");
+
+  // Update category selector
+  const catMenuItem = document.getElementById(`${catId}-selector`);
+  if (catMenuItem) {
+    catMenuItem.classList.add("category-selector-selected");
+
+    const catMenuBar = document.getElementById("kit-category-selector");
+    if (catMenuBar) {
+      for (const sibling of catMenuBar.children) {
+        if (sibling !== catMenuItem) {
+          sibling.classList.remove("category-selector-selected");
+        }
+      }
     }
   }
 }
 
+// Make showCategory available globally for onclick handlers
+window.showCategory = showCategory;
+
 function toggleDeploymentDetails(kitId, forceOpen = false) {
-  let detailsDiv = document.getElementById(`${kitId}-deployment-details`);
-  if (forceOpen || detailsDiv.style.display === "none") {
-    detailsDiv.style.display = "block";
-  } else {
-    detailsDiv.style.display = "none";
+  const detailsDiv = document.getElementById(`${kitId}-deployment-details`);
+  if (detailsDiv) {
+    if (forceOpen || detailsDiv.style.display === "none") {
+      detailsDiv.style.display = "block";
+    } else {
+      detailsDiv.style.display = "none";
+    }
   }
 }
 
+// Make available globally
+window.toggleDeploymentDetails = toggleDeploymentDetails;
+
 function closeDeploymentPane(kitId) {
-  document.getElementById(`${kitId}-deployment-progress`).style.display = "none";
-  document.getElementById(`${kitId}-deployment-details`).style.display = "none";
+  const progressDiv = document.getElementById(`${kitId}-deployment-progress`);
+  const detailsDiv = document.getElementById(`${kitId}-deployment-details`);
+
+  if (progressDiv) progressDiv.style.display = "none";
+  if (detailsDiv) detailsDiv.style.display = "none";
 }
 
 function getAllKitsMetadata() {
@@ -2733,8 +3455,8 @@ function getAllKitsMetadata() {
       let thisCatLink = document.createElement("a");
       thisCatLink.innerText = tlc;
       thisCatSpan.appendChild(thisCatLink);
-      // amazonq-ignore-next-line
-      thisCatSpan.setAttribute("onclick", `showCategory('${categoryId}')`);
+      // Use event listener instead of inline onclick
+      thisCatSpan.addEventListener("click", () => showCategory(categoryId));
       catSpans.push(thisCatSpan);
 
       let tlcDiv = document.createElement("div");
@@ -2819,35 +3541,35 @@ function getAllKitsMetadata() {
           let kitConfig = document.createElement("button");
           kitConfig.id = `${kitId}-config-button`;
           kitConfig.innerText = `Configure ${kit["Name"]}`;
-          // amazonq-ignore-next-line
-          kitConfig.setAttribute("onclick", `configureKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitConfig.addEventListener("click", () => configureKit(kitId));
           //install button
           let kitInstall = document.createElement("button");
           kitInstall.id = `${kitId}-install-button`;
           kitInstall.innerText = `Install ${kit["Name"]}`;
-          // amazonq-ignore-next-line
-          kitInstall.setAttribute("onclick", `installKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitInstall.addEventListener("click", () => installKit(kitId));
           kitInstall.style.display = "none";
           //update button
           let kitUpdate = document.createElement("button");
           kitUpdate.id = `${kitId}-update-button`;
           kitUpdate.innerText = `Update ${kit["Name"]}`;
-          // amazonq-ignore-next-line
-          kitUpdate.setAttribute("onclick", `installKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitUpdate.addEventListener("click", () => installKit(kitId));
           kitUpdate.style.display = "none";
           //delete button
           let kitDelete = document.createElement("button");
           kitDelete.id = `${kitId}-delete-button`;
           kitDelete.innerText = `Delete`;
-          // amazonq-ignore-next-line
-          kitDelete.setAttribute("onclick", `deleteKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitDelete.addEventListener("click", () => deleteKit(kitId));
           kitDelete.style.display = "none";
           //cancel button
           let kitCancel = document.createElement("button");
           kitCancel.id = `${kitId}-cancel-button`;
           kitCancel.innerText = `Cancel`;
-          // amazonq-ignore-next-line
-          kitCancel.setAttribute("onclick", `hideConfigForKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitCancel.addEventListener("click", () => hideConfigForKit(kitId));
           kitCancel.style.display = "none";
           kitCancel.style.float = "right";
 
@@ -2864,8 +3586,8 @@ function getAllKitsMetadata() {
 
           let kitLogProgBar = document.createElement("div");
           kitLogProgBar.classList.add("progress-bar-striped");
-          // amazonq-ignore-next-line
-          kitLogProgBar.setAttribute("onclick", `toggleDeploymentDetails('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitLogProgBar.addEventListener("click", () => toggleDeploymentDetails(kitId));
           kitLogProgBar.id = `${kitId}-deployment-progress-bar`;
           let kitLogProg = document.createElement("div");
           kitLogProg.style.width = "100%";
@@ -3003,7 +3725,10 @@ function afterRegionOptIn(err, data) {
 // }
 
 function hideLoadingBlock() {
-  document.getElementById("loading-block").style.display = "none";
+  const loadingBlock = document.getElementById("loading-block");
+  if (loadingBlock) {
+    loadingBlock.style.display = "none";
+  }
 }
 
 /*
@@ -3119,7 +3844,11 @@ function checkDeliveryStackCompleteness() {
           console.error(err);
         } else {
           console.log(data);
-          if (data.hasOwnProperty("Stacks") && data.Stacks[0].hasOwnProperty("StackStatus") && data.Stacks[0].StackStatus === "CREATE_COMPLETE") {
+          if (
+            data.hasOwnProperty("Stacks") &&
+            data.Stacks[0].hasOwnProperty("StackStatus") &&
+            data.Stacks[0].StackStatus === "CREATE_COMPLETE"
+          ) {
             if (data.Stacks[0].Outputs.length > 0) {
               for (let i = 0; i < data.Stacks[0].Outputs.length; i++) {
                 if (data.Stacks[0].Outputs[i].ExportName === "CskSourceBucketName") {
@@ -3821,9 +4550,9 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
         }
         element += `</optgroup><optgroup label="Amazon Linux 2">`;
         for (let i = 0; i < window.amis.linux2.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.linux2[i]["Architecture"]}" value="${window.amis.linux2[i]["ImageId"]}">${window.amis.linux2[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.linux2[i]["Architecture"]}" value="${window.amis.linux2[i]["ImageId"]}">${window.amis.linux2[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
@@ -3840,9 +4569,9 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
       if (!amiFilter || amiFilter === "Ubuntu") {
         element += `<optgroup label="Ubuntu">`;
         for (let i = 0; i < window.amis.ubuntu.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.ubuntu[i]["Architecture"]}" value="${window.amis.ubuntu[i]["ImageId"]}">${window.amis.ubuntu[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.ubuntu[i]["Architecture"]}" value="${window.amis.ubuntu[i]["ImageId"]}">${window.amis.ubuntu[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
@@ -3854,17 +4583,17 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
         }
         element += `</optgroup><optgroup label="RHEL">`;
         for (let i = 0; i < window.amis.rhel.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.rhel[i]["Architecture"]}" value="${window.amis.rhel[i]["ImageId"]}">${window.amis.rhel[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.rhel[i]["Architecture"]}" value="${window.amis.rhel[i]["ImageId"]}">${window.amis.rhel[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
         element += `</optgroup><optgroup label="RHEL (Arm)">`;
         for (let i = 0; i < window.amis.rhelArm.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.rhelArm[i]["Architecture"]}" value="${window.amis.rhelArm[i]["ImageId"]}">${window.amis.rhelArm[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.rhelArm[i]["Architecture"]}" value="${window.amis.rhelArm[i]["ImageId"]}">${window.amis.rhelArm[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
@@ -4147,7 +4876,8 @@ function filterDbInstanceClasses() {
       }
       let currentValue = instanceClassSelects[i].value;
       instanceClassSelects[i].innerHTML = "";
-      let dbInstanceClasses = window.dbInstances[dbEngineSelects[k].options[dbEngineSelects[k].selectedIndex].getAttribute("engine")][dbEngineSelects[k].value];
+      let dbInstanceClasses =
+        window.dbInstances[dbEngineSelects[k].options[dbEngineSelects[k].selectedIndex].getAttribute("engine")][dbEngineSelects[k].value];
       let seenInstanceFamilies = {};
       let optgroups = {};
       for (let instanceClass in dbInstanceClasses) {
@@ -4235,7 +4965,9 @@ function filterAmis() {
   let instanceTypeSelects = document.getElementsByClassName("instance-type-selector");
   for (let k = 0; k < instanceTypeSelects.length; k++) {
     let selectedArch =
-      instanceTypeSelects[k].selectedIndex > -1 ? instanceTypeSelects[k].options[instanceTypeSelects[k].selectedIndex].getAttribute("arch") : null;
+      instanceTypeSelects[k].selectedIndex > -1
+        ? instanceTypeSelects[k].options[instanceTypeSelects[k].selectedIndex].getAttribute("arch")
+        : null;
     let selectId = instanceTypeSelects[k].id;
     let kitId = selectId.split("|")[0];
     let amiSelects = document.getElementsByClassName("ami-selector");

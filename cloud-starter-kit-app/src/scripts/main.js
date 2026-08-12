@@ -41,15 +41,15 @@ let mainWindow = null;
 function createWindow() {
   // Create the browser window.
   let webPrefs = {
-    nodeIntegration: true,
+    // nodeIntegration: true,
     devTools: true,
+    sandbox: false,
     preload: path.resolve(app.getAppPath(), "src", "scripts", "preload.min.js"),
   };
   if (app.isPackaged) {
     // webPrefs.devTools = true;
     webPrefs.devTools = false;
   }
-  webPrefs.devTools = true;
   mainWindow = new BrowserWindow({
     width: !app.isPackaged ? 1900 : 1600,
     height: !app.isPackaged ? 900 : 950,

@@ -1,6 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
+// Import modules - Note: In browser context, these would need to be bundled
+// For now, we'll make them available via window object from a separate script
+// or use a bundler like webpack/rollup
+
 let region = null;
 let account = null;
 let progressBars = {};
@@ -13,6 +17,11 @@ let defaultCategory = null;
 
 document.documentElement.setAttribute("data-theme", "light");
 const decoder = new TextDecoder();
+
+// Storage helper functions are defined in utilities.js (concatenated before this file)
+// getValueInNamespace and setValueInNamespace are already available globally
+
+// appendHtmlToNode is defined in utilities.js (concatenated before this file)
 
 async function checkForKey() {
   let existingConfig = localStorage.getItem("kitConfig");
@@ -260,7 +269,7 @@ let kitConfigsShowing = {};
 function configureKit(kitId) {
   let kit = kitMetadata[kitId];
   kitConfigsShowing[kitId] = true;
-  console.log(`configuring ${kit.kitId}`);
+  console.log(`configuring ${kit.kitId || kitId}`);
   if (kit.hasOwnProperty("Templates")) {
     //cfn kit
     displayTemplateConfig(kitId);
@@ -372,35 +381,57 @@ function destroySamApp(kitId) {
 }
 
 function showCategory(catId) {
-  let cat = document.getElementById(catId);
+  const cat = document.getElementById(catId);
+  if (!cat) return;
+
   cat.style.display = "block";
-  for (let sibling of cat.parentNode.children) {
+
+  // Hide siblings
+  for (const sibling of cat.parentNode.children) {
     if (sibling !== cat) {
       sibling.style.display = "none";
     }
   }
-  let catMenuItem = document.getElementById(`${catId}-selector`);
-  catMenuItem.classList.add("category-selector-selected");
-  let catMenuBar = document.getElementById("kit-category-selector");
-  for (let sibling of catMenuBar.children) {
-    if (sibling !== catMenuItem) {
-      sibling.classList.remove("category-selector-selected");
+
+  // Update category selector
+  const catMenuItem = document.getElementById(`${catId}-selector`);
+  if (catMenuItem) {
+    catMenuItem.classList.add("category-selector-selected");
+
+    const catMenuBar = document.getElementById("kit-category-selector");
+    if (catMenuBar) {
+      for (const sibling of catMenuBar.children) {
+        if (sibling !== catMenuItem) {
+          sibling.classList.remove("category-selector-selected");
+        }
+      }
     }
   }
 }
 
+// Make showCategory available globally for onclick handlers
+window.showCategory = showCategory;
+
 function toggleDeploymentDetails(kitId, forceOpen = false) {
-  let detailsDiv = document.getElementById(`${kitId}-deployment-details`);
-  if (forceOpen || detailsDiv.style.display === "none") {
-    detailsDiv.style.display = "block";
-  } else {
-    detailsDiv.style.display = "none";
+  const detailsDiv = document.getElementById(`${kitId}-deployment-details`);
+  if (detailsDiv) {
+    if (forceOpen || detailsDiv.style.display === "none") {
+      detailsDiv.style.display = "block";
+    } else {
+      detailsDiv.style.display = "none";
+    }
   }
 }
 
+// Make available globally
+window.toggleDeploymentDetails = toggleDeploymentDetails;
+
 function closeDeploymentPane(kitId) {
-  document.getElementById(`${kitId}-deployment-progress`).style.display = "none";
-  document.getElementById(`${kitId}-deployment-details`).style.display = "none";
+  const progressDiv = document.getElementById(`${kitId}-deployment-progress`);
+  const detailsDiv = document.getElementById(`${kitId}-deployment-details`);
+
+  if (progressDiv) progressDiv.style.display = "none";
+  if (detailsDiv) detailsDiv.style.display = "none";
 }
 
 function getAllKitsMetadata() {
@@ -427,8 +458,8 @@ function getAllKitsMetadata() {
       let thisCatLink = document.createElement("a");
       thisCatLink.innerText = tlc;
       thisCatSpan.appendChild(thisCatLink);
-      // amazonq-ignore-next-line
-      thisCatSpan.setAttribute("onclick", `showCategory('${categoryId}')`);
+      // Use event listener instead of inline onclick
+      thisCatSpan.addEventListener("click", () => showCategory(categoryId));
       catSpans.push(thisCatSpan);
 
       let tlcDiv = document.createElement("div");
@@ -513,35 +544,35 @@ function getAllKitsMetadata() {
           let kitConfig = document.createElement("button");
           kitConfig.id = `${kitId}-config-button`;
           kitConfig.innerText = `Configure ${kit["Name"]}`;
-          // amazonq-ignore-next-line
-          kitConfig.setAttribute("onclick", `configureKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitConfig.addEventListener("click", () => configureKit(kitId));
           //install button
           let kitInstall = document.createElement("button");
           kitInstall.id = `${kitId}-install-button`;
           kitInstall.innerText = `Install ${kit["Name"]}`;
-          // amazonq-ignore-next-line
-          kitInstall.setAttribute("onclick", `installKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitInstall.addEventListener("click", () => installKit(kitId));
           kitInstall.style.display = "none";
           //update button
           let kitUpdate = document.createElement("button");
           kitUpdate.id = `${kitId}-update-button`;
           kitUpdate.innerText = `Update ${kit["Name"]}`;
-          // amazonq-ignore-next-line
-          kitUpdate.setAttribute("onclick", `installKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitUpdate.addEventListener("click", () => installKit(kitId));
           kitUpdate.style.display = "none";
           //delete button
           let kitDelete = document.createElement("button");
           kitDelete.id = `${kitId}-delete-button`;
           kitDelete.innerText = `Delete`;
-          // amazonq-ignore-next-line
-          kitDelete.setAttribute("onclick", `deleteKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitDelete.addEventListener("click", () => deleteKit(kitId));
           kitDelete.style.display = "none";
           //cancel button
           let kitCancel = document.createElement("button");
           kitCancel.id = `${kitId}-cancel-button`;
           kitCancel.innerText = `Cancel`;
-          // amazonq-ignore-next-line
-          kitCancel.setAttribute("onclick", `hideConfigForKit('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitCancel.addEventListener("click", () => hideConfigForKit(kitId));
           kitCancel.style.display = "none";
           kitCancel.style.float = "right";
 
@@ -558,8 +589,8 @@ function getAllKitsMetadata() {
 
           let kitLogProgBar = document.createElement("div");
           kitLogProgBar.classList.add("progress-bar-striped");
-          // amazonq-ignore-next-line
-          kitLogProgBar.setAttribute("onclick", `toggleDeploymentDetails('${kitId}')`);
+          // Use event listener instead of inline onclick
+          kitLogProgBar.addEventListener("click", () => toggleDeploymentDetails(kitId));
           kitLogProgBar.id = `${kitId}-deployment-progress-bar`;
           let kitLogProg = document.createElement("div");
           kitLogProg.style.width = "100%";
@@ -697,7 +728,10 @@ function afterRegionOptIn(err, data) {
 // }
 
 function hideLoadingBlock() {
-  document.getElementById("loading-block").style.display = "none";
+  const loadingBlock = document.getElementById("loading-block");
+  if (loadingBlock) {
+    loadingBlock.style.display = "none";
+  }
 }
 
 /*
@@ -813,7 +847,11 @@ function checkDeliveryStackCompleteness() {
           console.error(err);
         } else {
           console.log(data);
-          if (data.hasOwnProperty("Stacks") && data.Stacks[0].hasOwnProperty("StackStatus") && data.Stacks[0].StackStatus === "CREATE_COMPLETE") {
+          if (
+            data.hasOwnProperty("Stacks") &&
+            data.Stacks[0].hasOwnProperty("StackStatus") &&
+            data.Stacks[0].StackStatus === "CREATE_COMPLETE"
+          ) {
             if (data.Stacks[0].Outputs.length > 0) {
               for (let i = 0; i < data.Stacks[0].Outputs.length; i++) {
                 if (data.Stacks[0].Outputs[i].ExportName === "CskSourceBucketName") {
@@ -1515,9 +1553,9 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
         }
         element += `</optgroup><optgroup label="Amazon Linux 2">`;
         for (let i = 0; i < window.amis.linux2.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.linux2[i]["Architecture"]}" value="${window.amis.linux2[i]["ImageId"]}">${window.amis.linux2[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.linux2[i]["Architecture"]}" value="${window.amis.linux2[i]["ImageId"]}">${window.amis.linux2[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
@@ -1534,9 +1572,9 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
       if (!amiFilter || amiFilter === "Ubuntu") {
         element += `<optgroup label="Ubuntu">`;
         for (let i = 0; i < window.amis.ubuntu.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.ubuntu[i]["Architecture"]}" value="${window.amis.ubuntu[i]["ImageId"]}">${window.amis.ubuntu[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.ubuntu[i]["Architecture"]}" value="${window.amis.ubuntu[i]["ImageId"]}">${window.amis.ubuntu[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
@@ -1548,17 +1586,17 @@ function makeInputElement(kitId, obj, key, amiFilter, dbEngineFilter, curVal = n
         }
         element += `</optgroup><optgroup label="RHEL">`;
         for (let i = 0; i < window.amis.rhel.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.rhel[i]["Architecture"]}" value="${window.amis.rhel[i]["ImageId"]}">${window.amis.rhel[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.rhel[i]["Architecture"]}" value="${window.amis.rhel[i]["ImageId"]}">${window.amis.rhel[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
         element += `</optgroup><optgroup label="RHEL (Arm)">`;
         for (let i = 0; i < window.amis.rhelArm.length; i++) {
-          element += `<option os="Linux" arch="${window.amis.rhelArm[i]["Architecture"]}" value="${window.amis.rhelArm[i]["ImageId"]}">${window.amis.rhelArm[i][
-            "ShortName"
-          ]
+          element += `<option os="Linux" arch="${window.amis.rhelArm[i]["Architecture"]}" value="${window.amis.rhelArm[i]["ImageId"]}">${window.amis.rhelArm[
+            i
+          ]["ShortName"]
             .split("/")
             .pop()}</option>`;
         }
@@ -1841,7 +1879,8 @@ function filterDbInstanceClasses() {
       }
       let currentValue = instanceClassSelects[i].value;
       instanceClassSelects[i].innerHTML = "";
-      let dbInstanceClasses = window.dbInstances[dbEngineSelects[k].options[dbEngineSelects[k].selectedIndex].getAttribute("engine")][dbEngineSelects[k].value];
+      let dbInstanceClasses =
+        window.dbInstances[dbEngineSelects[k].options[dbEngineSelects[k].selectedIndex].getAttribute("engine")][dbEngineSelects[k].value];
       let seenInstanceFamilies = {};
       let optgroups = {};
       for (let instanceClass in dbInstanceClasses) {
@@ -1929,7 +1968,9 @@ function filterAmis() {
   let instanceTypeSelects = document.getElementsByClassName("instance-type-selector");
   for (let k = 0; k < instanceTypeSelects.length; k++) {
     let selectedArch =
-      instanceTypeSelects[k].selectedIndex > -1 ? instanceTypeSelects[k].options[instanceTypeSelects[k].selectedIndex].getAttribute("arch") : null;
+      instanceTypeSelects[k].selectedIndex > -1
+        ? instanceTypeSelects[k].options[instanceTypeSelects[k].selectedIndex].getAttribute("arch")
+        : null;
     let selectId = instanceTypeSelects[k].id;
     let kitId = selectId.split("|")[0];
     let amiSelects = document.getElementsByClassName("ami-selector");

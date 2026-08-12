@@ -17,9 +17,27 @@ class CdkAppPipelineStack extends Stack {
     super(scope, id, props);
 
     // The code that defines your stack goes here
+    const accessLogsBucket = new s3.Bucket(this, "AccessLogsBucket", {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
+    });
+
+    const pipelineArtifactsBucket = new s3.Bucket(this, "PipelineArtifactsBucket", {
+      versioned: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.KMS_MANAGED,
+      enforceSSL: true,
+      serverAccessLogsBucket: accessLogsBucket,
+      serverAccessLogsPrefix: "pipeline-artifacts",
+      removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
+    });
+
     const pipeline = new codepipeline.Pipeline(this, "Pipeline", {
       pipelineType: codepipeline.PipelineType.V2,
       executionMode: codepipeline.ExecutionMode.PARALLEL,
+      artifactBucket: pipelineArtifactsBucket,
     });
     const sourceBucket = new s3.Bucket(this, "CskSourceBucket", {
       versioned: true,
@@ -27,6 +45,8 @@ class CdkAppPipelineStack extends Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
+      serverAccessLogsBucket: accessLogsBucket,
+      serverAccessLogsPrefix: "source-bucket",
       removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
     });
     const buildOutput = new codepipeline.Artifact();

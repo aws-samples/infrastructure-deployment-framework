@@ -142,6 +142,24 @@
                                 "Ref": "AWS::NoValue"
                             }
                         ]
+                    },
+                    {
+                        "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+                        "Priority": 2,
+                        "OverrideAction": {
+                            "None": {}
+                        },
+                        "VisibilityConfig": {
+                            "SampledRequestsEnabled": true,
+                            "CloudWatchMetricsEnabled": true,
+                            "MetricName": "RuleWithKnownBadInputsMetric"
+                        },
+                        "Statement": {
+                            "ManagedRuleGroupStatement": {
+                                "VendorName": "AWS",
+                                "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+                            }
+                        }
                     }
                 ]
             }

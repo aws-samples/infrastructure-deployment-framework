@@ -1,2 +1,3 @@
 boto3
 shortuuid
+urllib3>=2.3.0

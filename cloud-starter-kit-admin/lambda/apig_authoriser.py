@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # A simple request-based authorizer example to demonstrate how to use request
 # parameters to allow or deny a request. In this example, a request is
 # authorized if the client-supplied headerauth1 header, QueryString1

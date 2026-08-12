@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 python -m venv create_layer
 source create_layer/bin/activate
 pip install -r make_layer_requirements.txt

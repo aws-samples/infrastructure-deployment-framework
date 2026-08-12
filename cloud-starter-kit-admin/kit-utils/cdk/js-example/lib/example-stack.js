@@ -1,3 +1,6 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 const { Stack } = require('aws-cdk-lib');
 const ec2 = require('aws-cdk-lib/aws-ec2');
 

@@ -1,38 +1,27 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
+// Import service modules
+const credentialsService = require("./services/aws-credentials");
+const cloudformationService = require("./services/aws-cloudformation");
+const ec2Service = require("./services/aws-ec2");
+const s3Service = require("./services/aws-s3");
+const otherServices = require("./services/aws-other");
+
+// Direct imports still needed for specific operations
 const { fromEnv } = require("@aws-sdk/credential-providers");
+const { Upload } = require("@aws-sdk/lib-storage");
+const { S3Client, S3ServiceException, paginateListObjectsV2 } = require("@aws-sdk/client-s3");
 const {
   CloudFormationClient,
   DescribeStacksCommand,
   DescribeStackEventsCommand,
   CreateStackCommand,
   ValidateTemplateCommand,
-  DeleteStackCommand,
   UpdateStackCommand,
+  DeleteStackCommand,
 } = require("@aws-sdk/client-cloudformation");
 const { CodePipelineClient, StartPipelineExecutionCommand, GetPipelineExecutionCommand } = require("@aws-sdk/client-codepipeline");
-const {
-  EC2Client,
-  DescribeRegionsCommand,
-  DescribeVpcsCommand,
-  DescribeSubnetsCommand,
-  DescribeKeyPairsCommand,
-  CreateKeyPairCommand,
-  DescribeManagedPrefixListsCommand,
-  DescribeInstanceTypesCommand,
-  DescribeImagesCommand,
-  DescribeVpcEndpointsCommand,
-  DescribeInstanceConnectEndpointsCommand,
-} = require("@aws-sdk/client-ec2");
-const { IAMClient, GetCredentialReportCommand } = require("@aws-sdk/client-iam");
-const { Upload } = require("@aws-sdk/lib-storage");
-const { S3Client, S3ServiceException, ListBucketsCommand, paginateListObjectsV2, GetObjectCommand } = require("@aws-sdk/client-s3");
-const { SSMClient, GetParametersByPathCommand } = require("@aws-sdk/client-ssm");
-const { STSClient, GetCallerIdentityCommand } = require("@aws-sdk/client-sts");
-const { RDSClient, DescribeDBEngineVersionsCommand, DescribeOrderableDBInstanceOptionsCommand } = require("@aws-sdk/client-rds");
-const { Route53Client, ListHostedZonesCommand } = require("@aws-sdk/client-route-53");
-const { BedrockClient, ListFoundationModelsCommand } = require("@aws-sdk/client-bedrock");
 
 const { rootPath } = require("electron-root-path");
 const path = require("path");
@@ -66,11 +55,10 @@ const stacks = {};
 process.env.ELECTRON_ENABLE_LOGGING = true;
 // process.versions['sdk'] = sdk.VERSION;
 
-//set default region
-let REGION = process.env.AWS_DEFAULT_REGION || "us-east-1";
-
-//keep record of current account
-let ACCOUNT = null;
+// Region and account are now managed by credentials service
+// Keep local references for backward compatibility
+let REGION = credentialsService.getRegion();
+let ACCOUNT = credentialsService.getAccount();
 
 function openInBrowser(url) {
   require("electron").shell.openExternal(url);
@@ -83,151 +71,45 @@ function setFileHost(url) {
 contextBridge.exposeInMainWorld("setFileHost", (url) => setFileHost(url));
 
 /*
- * Credential management
+ * Credential management - now using service module
  */
 
 function checkIfCredsAvailable(callback) {
-  if (process.env.hasOwnProperty("AWS_ACCESS_KEY_ID") && process.env.hasOwnProperty("AWS_SECRET_ACCESS_KEY")) {
-    configureSdkFromEnv(callback);
-  }
+  credentialsService.checkIfCredsAvailable((err, data) => {
+    if (data) {
+      ACCOUNT = credentialsService.getAccount();
+    }
+    callback(err, data);
+  });
 }
 contextBridge.exposeInMainWorld("checkIfCredsAvailable", (callback) => checkIfCredsAvailable(callback));
 
-//When the user submits credentials in the UI, this gets called
-
 function setCredentials(data, callback) {
-  try {
-    let rows = data.split("\n");
-    if (rows.length < 2) {
-      // Need at least 3 rows of data
-      callback(
-        new Error(
-          "You haven't supplied sufficient information in either the pasted credentials or the supplied key and secret. Please check your inputs and try again."
-        )
-      );
-    } else {
-      /*
-       * Parse the input text and find the credentials.
-       * NB we don't know if these creds are valid until we check them using
-       * sts.getCallerIdentity further down
-       */
-      for (let i = 0; i < rows.length; i++) {
-        if (rows[i].match(/AWS_ACCESS_KEY_ID/)) {
-          let accessKey = rows[i].split("=")[1].replace(/\W/, "").substring(0, 20);
-          if (rows[i].includes(accessKey)) {
-            process.env["AWS_ACCESS_KEY_ID"] = accessKey;
-          } else {
-            console.log("parsed 'AWS_ACCESS_KEY_ID' didn't match input");
-          }
-        } else if (rows[i].match(/AWS_SECRET_ACCESS_KEY/)) {
-          let secretKey = rows[i]
-            .split("=")[1]
-            .replace(/[^\w/+]/, "")
-            .substring(0, 40);
-          if (rows[i].includes(secretKey)) {
-            process.env["AWS_SECRET_ACCESS_KEY"] = secretKey;
-          } else {
-            console.log("parsed 'AWS_SECRET_ACCESS_KEY' didn't match input");
-          }
-        } else if (rows[i].match(/AWS_SESSION_TOKEN/)) {
-          let sessToken = rows[i].replace(/.+?=/, "").replace(/[^\w/+=]/, "");
-          if (rows[i].includes(sessToken)) {
-            process.env["AWS_SESSION_TOKEN"] = sessToken;
-          } else {
-            console.log("parsed 'AWS_SESSION_TOKEN' didn't match input");
-          }
-        }
-      }
-      // console.log(envVars)
-      if (process.env.hasOwnProperty("AWS_ACCESS_KEY_ID") && process.env.hasOwnProperty("AWS_SECRET_ACCESS_KEY")) {
-        // Let's see if the credentials work
-        configureSdkFromEnv(callback, true);
-      } else {
-        callback(new Error("Wasn't able to parse valid credentials from pasted text!"));
-      }
-    }
-  } catch (e) {
-    console.log(e);
-    callback(new Error("Credential processing failed: " + JSON.stringify(e)));
-  }
-}
-
-contextBridge.exposeInMainWorld("setCredentials", (data, cb) => setCredentials(data, cb));
-
-async function configureSdkFromEnv(callback, showError = false) {
-  let sts = new STSClient({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const command = new GetCallerIdentityCommand();
-  await sts.send(command).then(
-    (data) => {
-      if (data.Account !== process.env.CDK_DEFAULT_ACCOUNT) {
+  credentialsService.setCredentials(data, (err, credentialSummary) => {
+    if (credentialSummary) {
+      // Update local references
+      ACCOUNT = credentialsService.getAccount();
+      REGION = credentialsService.getRegion();
+      // Check if account changed and reset stacks
+      if (credentialSummary.AWS_ACCOUNT_ID !== process.env.CDK_DEFAULT_ACCOUNT) {
         resetStacks();
       }
-      let credentialSummary = {};
-      credentialSummary["AWS_SECRET_ACCESS_KEY"] = process.env["AWS_SECRET_ACCESS_KEY"]
-        .split("")
-        .map((x) => "*")
-        .join("");
-      credentialSummary["AWS_ACCESS_KEY_ID"] = process.env["AWS_ACCESS_KEY_ID"];
-      credentialSummary["AWS_ACCOUNT_ID"] = process.env.CDK_DEFAULT_ACCOUNT = ACCOUNT = data.Account;
-      credentialSummary["IDENTITY"] = data.Arn.split(":").pop();
-      credentialSummary["SDK_VERSION"] = sts.SDK_VERSION;
-      try {
-        callback(null, credentialSummary);
-      } catch (e) {
-        console.log(e);
-      }
-    },
-    (err) => {
-      if (showError) {
-        callback(new Error("Unable to create a session with the current supplied credentials."));
-      } else {
-        callback(null, null);
-      }
     }
-  );
+    callback(err, credentialSummary);
+  });
 }
+contextBridge.exposeInMainWorld("setCredentials", (data, cb) => setCredentials(data, cb));
 
-async function checkSession(callback) {
-  // console.log("checking session")
-  if (process.env.hasOwnProperty("AWS_ACCESS_KEY_ID")) {
-    let sts = new STSClient({
-      region: REGION,
-      credentials: fromEnv(),
-    });
-    const command = new GetCallerIdentityCommand();
-    await sts.send(command).then(
-      (data) => {
-        callback(null, data);
-      },
-      (err) => {
-        callback(err, null);
-      }
-    );
-  }
+function checkSession(callback) {
+  credentialsService.checkSession(callback);
 }
 contextBridge.exposeInMainWorld("checkSession", (callback) => checkSession(callback));
 
 /*
  * Once we have credentials, find the regions that are available to this identity
  */
-async function getRegions(callback) {
-  let client = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {};
-  const command = new DescribeRegionsCommand(input);
-  await client.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getRegions(callback) {
+  ec2Service.getRegions(callback);
 }
 contextBridge.exposeInMainWorld("getRegions", (cb) => getRegions(cb));
 
@@ -246,372 +128,95 @@ contextBridge.exposeInMainWorld("getRegions", (cb) => getRegions(cb));
 // contextBridge.exposeInMainWorld('getAccountInfo', (account, cb) => getAccountInfo(account, cb))
 
 /*
- * These functions fetch info from the account that we use in the UI
+ * These functions fetch info from the account that we use in the UI - now using service modules
  */
 
-async function getBedrockModels(callback) {
-  let bedrock = new BedrockClient({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {};
-  const command = new ListFoundationModelsCommand(input);
-  await bedrock.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getBedrockModels(callback) {
+  otherServices.getBedrockModels(callback);
 }
 contextBridge.exposeInMainWorld("getBedrockModels", (cb) => getBedrockModels(cb));
 
-async function getVpcs(callback) {
-  const ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {};
-  const command = new DescribeVpcsCommand(input);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getVpcs(callback) {
+  ec2Service.getVpcs(callback);
 }
 contextBridge.exposeInMainWorld("getVpcs", (cb) => getVpcs(cb));
 
-async function getSubnets(callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {};
-  const command = new DescribeSubnetsCommand(input);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getSubnets(callback) {
+  ec2Service.getSubnets(callback);
 }
 contextBridge.exposeInMainWorld("getSubnets", (cb) => getSubnets(cb));
 
-async function getEc2KeyPairs(callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {};
-  const command = new DescribeKeyPairsCommand(input);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getEc2KeyPairs(callback) {
+  ec2Service.getEc2KeyPairs(callback);
 }
 contextBridge.exposeInMainWorld("getEc2KeyPairs", (cb) => getEc2KeyPairs(cb));
 
-async function getAmis(params, callback) {
-  let ssm = new SSMClient({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const command = new GetParametersByPathCommand(params);
-  await ssm.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getAmis(params, callback) {
+  otherServices.getAmis(params, callback);
 }
 contextBridge.exposeInMainWorld("getAmis", (params, cb) => getAmis(params, cb));
 
-async function describeAmis(params, callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const command = new DescribeImagesCommand(params);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function describeAmis(params, callback) {
+  ec2Service.describeAmis(params, callback);
 }
 contextBridge.exposeInMainWorld("describeAmis", (params, cb) => describeAmis(params, cb));
 
-async function describeInstanceTypes(params, callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const command = new DescribeInstanceTypesCommand(params);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function describeInstanceTypes(params, callback) {
+  ec2Service.describeInstanceTypes(params, callback);
 }
 contextBridge.exposeInMainWorld("describeInstanceTypes", (params, cb) => describeInstanceTypes(params, cb));
 
-async function describeDatabaseEngines(filters, callback) {
-  const rds = new RDSClient({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {
-    DefaultOnly: false,
-    ListSupportedCharacterSets: false,
-    ListSupportedTimezones: false,
-    IncludeAll: false,
-    Filters: [filters],
-  };
-  try {
-    let results = {};
-    let error = null;
-    let marker = "set";
-    while (marker !== "") {
-      input.Marker = marker === "set" ? "" : marker;
-      const command = new DescribeDBEngineVersionsCommand(input);
-      await rds.send(command).then(
-        (data) => {
-          if (data.hasOwnProperty("DBEngineVersions")) {
-            data.DBEngineVersions.forEach((item) => {
-              if (!results.hasOwnProperty(item.Engine)) {
-                results[item.Engine] = {};
-              }
-              if (!results[item.Engine].hasOwnProperty(item.EngineVersion)) {
-                results[item.Engine][item.EngineVersion] = {};
-              }
-              results[item.Engine][item.EngineVersion] = item;
-            });
-            marker = data.hasOwnProperty("Marker") ? data.Marker : "";
-          }
-        },
-        (err) => {
-          marker = "";
-          error = err;
-          console.log(err);
-        }
-      );
-    }
-    callback(error, results);
-  } catch (e) {
-    callback(e, null);
-  }
+function describeDatabaseEngines(filters, callback) {
+  otherServices.describeDatabaseEngines(filters, callback);
 }
 contextBridge.exposeInMainWorld("describeDatabaseEngines", (f, cb) => describeDatabaseEngines(f, cb));
 
-async function describeDatabaseInstances(engine, callback) {
-  const rds = new RDSClient({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {
-    Engine: engine,
-  };
-  try {
-    let results = {};
-    let error = null;
-    let marker = "set";
-    while (marker !== "") {
-      input.Marker = marker === "set" ? "" : marker;
-      const command = new DescribeOrderableDBInstanceOptionsCommand(input);
-      await rds.send(command).then(
-        (data) => {
-          if (data.hasOwnProperty("OrderableDBInstanceOptions")) {
-            data.OrderableDBInstanceOptions.forEach((item) => {
-              if (!results.hasOwnProperty(item.Engine)) {
-                results[item.Engine] = {};
-              }
-              if (!results[item.Engine].hasOwnProperty(item.EngineVersion)) {
-                results[item.Engine][item.EngineVersion] = {};
-              }
-              if (!results[item.Engine][item.EngineVersion].hasOwnProperty(item.DBInstanceClass)) {
-                results[item.Engine][item.EngineVersion][item.DBInstanceClass] = {};
-              }
-              results[item.Engine][item.EngineVersion][item.DBInstanceClass] = item;
-            });
-            marker = data.hasOwnProperty("Marker") ? data.Marker : "";
-          }
-        },
-        (err) => {
-          marker = "";
-          error = err;
-          console.log(err);
-        }
-      );
-    }
-    callback(error, results);
-  } catch (e) {
-    callback(e, null);
-  }
+function describeDatabaseInstances(engine, callback) {
+  otherServices.describeDatabaseInstances(engine, callback);
 }
 contextBridge.exposeInMainWorld("describeDatabaseInstances", (f, cb) => describeDatabaseInstances(f, cb));
 
-async function getPrefixLists(params, callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-    MaxResults: 100,
-  });
-  const command = new DescribeManagedPrefixListsCommand(params);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
-  // ec2.describeManagedPrefixLists(params, callback)
+function getPrefixLists(params, callback) {
+  ec2Service.getPrefixLists(params, callback);
 }
 contextBridge.exposeInMainWorld("getPrefixLists", (params, cb) => getPrefixLists(params, cb));
 
-async function getVpcEndpoints(params, callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-    MaxResults: 100,
-  });
-  const command = new DescribeVpcEndpointsCommand(params);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
-  // ec2.describeManagedPrefixLists(params, callback)
+function getVpcEndpoints(params, callback) {
+  ec2Service.getVpcEndpoints(params, callback);
 }
 contextBridge.exposeInMainWorld("getVpcEndpoints", (params, cb) => getVpcEndpoints(params, cb));
 
-async function getEc2InstanceConnectEndpoints(params, callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-    MaxResults: 100,
-  });
-  const command = new DescribeInstanceConnectEndpointsCommand(params);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getEc2InstanceConnectEndpoints(params, callback) {
+  ec2Service.getEc2InstanceConnectEndpoints(params, callback);
 }
 contextBridge.exposeInMainWorld("getEc2InstanceConnectEndpoints", (params, cb) => getEc2InstanceConnectEndpoints(params, cb));
 
-async function getHostedZones(params, callback) {
-  const r53 = new Route53Client({
-    region: REGION,
-    credentials: fromEnv(),
-    MaxResults: 100,
-  });
-  const command = new ListHostedZonesCommand(params);
-  await r53.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getHostedZones(params, callback) {
+  otherServices.getHostedZones(params, callback);
 }
 contextBridge.exposeInMainWorld("getHostedZones", (params, cb) => getHostedZones(params, cb));
 
 /*
  * Once we have credentials, there are some things we can do with SDK
  */
-async function listBuckets(callback) {
-  let s3 = new S3Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const command = new ListBucketsCommand();
-  await s3.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function listBuckets(callback) {
+  s3Service.listBuckets(callback);
 }
 contextBridge.exposeInMainWorld("listBuckets", (cb) => listBuckets(cb));
 
 async function getTextFileFromBucket(bucket, key) {
-  let s3 = new S3Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const input = {
-    Bucket: bucket,
-    Key: key,
-  };
-  const command = new GetObjectCommand(input);
-  let response = await s3.send(command);
-  let data = await response.Body.transformToString();
-  return data;
+  return await s3Service.getTextFileFromBucket(bucket, key);
 }
 contextBridge.exposeInMainWorld("getTextFileFromBucket", (bucket, key) => getTextFileFromBucket(bucket, key));
 
-async function getCredentialReport(callback) {
-  let iam = new IAMClient({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  const command = new GetCredentialReportCommand();
-  await iam.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function getCredentialReport(callback) {
+  otherServices.getCredentialReport(callback);
 }
 contextBridge.exposeInMainWorld("getCredentialReport", (cb) => getCredentialReport(cb));
 
 //create a key pair for the user
-async function generateKeyPair(region, callback) {
-  let ec2 = new EC2Client({
-    region: REGION,
-    credentials: fromEnv(),
-  });
-  var params = {
-    KeyName: `${region}-ec2-key-pair`,
-  };
-  const command = new CreateKeyPairCommand(params);
-  await ec2.send(command).then(
-    (data) => {
-      callback(null, data);
-    },
-    (err) => {
-      callback(err, null);
-    }
-  );
+function generateKeyPair(region, callback) {
+  ec2Service.generateKeyPair(region, callback);
 }
 contextBridge.exposeInMainWorld("generateKeyPair", (region, cb) => generateKeyPair(region, cb));
 
@@ -619,7 +224,8 @@ contextBridge.exposeInMainWorld("generateKeyPair", (region, cb) => generateKeyPa
  * When the user chooses a new region in the UI, this gets called
  */
 function setRegion(region) {
-  process.env.AWS_DEFAULT_REGION = process.env.CDK_DEFAULT_REGION = REGION = region;
+  credentialsService.setRegion(region);
+  REGION = credentialsService.getRegion();
 }
 contextBridge.exposeInMainWorld("setRegion", (region) => setRegion(region));
 
@@ -823,7 +429,9 @@ function deriveCfnStackName(template, inputs, stackNamingParam) {
   }
   return stackName;
 }
-contextBridge.exposeInMainWorld("deriveCfnStackName", (template, inputs, stackNamingParam) => deriveCfnStackName(template, inputs, stackNamingParam));
+contextBridge.exposeInMainWorld("deriveCfnStackName", (template, inputs, stackNamingParam) =>
+  deriveCfnStackName(template, inputs, stackNamingParam)
+);
 
 async function deriveAppStackNames(kitObject, inputs) {
   const manifest = await getFileFromFileHost(`kits/${kitObject["AppType"].toLowerCase()}-apps/${kitObject.Manifest}`);
@@ -948,11 +556,23 @@ async function deployCloudFormationTemplate(kitId, templateName, stackName, inpu
   };
   uploadIfNeededThenValidate(stackName, inputs, tags, templateName, templateBody, bucket, stackTrackingData, kitObject, callback);
 }
-contextBridge.exposeInMainWorld("deployCloudFormationTemplate", (kitId, template, stackName, inputs, bucket, kitObject, cb, updateRequested) =>
-  deployCloudFormationTemplate(kitId, template, stackName, inputs, bucket, kitObject, cb, updateRequested)
+contextBridge.exposeInMainWorld(
+  "deployCloudFormationTemplate",
+  (kitId, template, stackName, inputs, bucket, kitObject, cb, updateRequested) =>
+    deployCloudFormationTemplate(kitId, template, stackName, inputs, bucket, kitObject, cb, updateRequested)
 );
 
-async function uploadIfNeededThenValidate(stackName, inputs, tags, templateName, templateBody, bucket, stackTrackingData, kitObject, callback) {
+async function uploadIfNeededThenValidate(
+  stackName,
+  inputs,
+  tags,
+  templateName,
+  templateBody,
+  bucket,
+  stackTrackingData,
+  kitObject,
+  callback
+) {
   let cfParams = {
     StackName: stackName,
     Capabilities: ["CAPABILITY_NAMED_IAM"],
@@ -1063,7 +683,9 @@ async function deployAppViaSourceBucket(kitId, kitObject, inputs, region, accoun
   manifestFilename = removePathTraversals(kitObject.Manifest);
   const appType = kitObject["AppType"].toLowerCase();
   const manifest = await getFileFromFileHost(`kits/${appType}-apps/${manifestFilename}`);
-  const appFolder = manifest.hasOwnProperty("KitDirectoryOverride") ? manifest.KitDirectoryOverride : manifestFilename.replace(/.json$/, "");
+  const appFolder = manifest.hasOwnProperty("KitDirectoryOverride")
+    ? manifest.KitDirectoryOverride
+    : manifestFilename.replace(/.json$/, "");
   //download the relevant CDK files
   fs.writeFileSync(path.join(rootPath, "downloaded", "kits", `${appType}-apps`, manifestFilename), JSON.stringify(manifest));
   for (let i = 0; i < manifest.FileList.length; i++) {
@@ -1134,8 +756,10 @@ async function deployAppViaSourceBucket(kitId, kitObject, inputs, region, accoun
     }
   );
 }
-contextBridge.exposeInMainWorld("deployAppViaSourceBucket", (kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested) =>
-  deployAppViaSourceBucket(kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested)
+contextBridge.exposeInMainWorld(
+  "deployAppViaSourceBucket",
+  (kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested) =>
+    deployAppViaSourceBucket(kitId, manifestFilename, inputs, region, account, bucketName, callback, updateRequested)
 );
 
 function uploadApp(s3, bucketName, zipPath, primaryStack, callback, requestingUpdate = false) {
@@ -1472,7 +1096,11 @@ function getStackEvents(stackName, callback) {
               err.message
             );
             handleFailedStack(stackName);
-          } else if (stacks.hasOwnProperty(stackName) && stacks[stackName].hasOwnProperty("lastStatus") && stacks[stackName]["lastStatus"] !== err) {
+          } else if (
+            stacks.hasOwnProperty(stackName) &&
+            stacks[stackName].hasOwnProperty("lastStatus") &&
+            stacks[stackName]["lastStatus"] !== err
+          ) {
             stacks[stackName]["lastStatus"] = err;
             console.log("error changed stack status", err); // an error occurred
             handleFailedStack(stackName);

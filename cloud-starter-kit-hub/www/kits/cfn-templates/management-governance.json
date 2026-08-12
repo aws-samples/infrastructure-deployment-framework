@@ -206,6 +206,17 @@
         },
         "AccessLogsBucket83982689": {
             "Type": "AWS::S3::Bucket",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W35",
+                            "reason": "This IS the access logging bucket - enabling logging on it would create a recursive loop"
+                        }
+                    ]
+                },
+                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/AccessLogsBucket/Resource"
+            },
             "Properties": {
                 "BucketEncryption": {
                     "ServerSideEncryptionConfiguration": [
@@ -222,6 +233,9 @@
                     "IgnorePublicAcls": true,
                     "RestrictPublicBuckets": true
                 },
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                },
                 "Tags": [
                     {
                         "Key": "created-by",
@@ -231,9 +245,6 @@
             },
             "UpdateReplacePolicy": "Retain",
             "DeletionPolicy": "Retain",
-            "Metadata": {
-                "aws:cdk:path": "AwsCloudStarterManagementGovernanceStack/AccessLogsBucket/Resource"
-            },
             "Condition": "ShouldCreateConfigOrCloudTrailCondition"
         },
         "AccessLogsBucketPolicy7F77476F": {
@@ -315,6 +326,39 @@
                                     ]
                                 ]
                             }
+                        },
+                        {
+                            "Sid": "DenyNonSSLRequests",
+                            "Action": "s3:*",
+                            "Condition": {
+                                "Bool": {
+                                    "aws:SecureTransport": "false"
+                                }
+                            },
+                            "Effect": "Deny",
+                            "Principal": "*",
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "AccessLogsBucket83982689",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "AccessLogsBucket83982689",
+                                                    "Arn"
+                                                ]
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                }
+                            ]
                         }
                     ],
                     "Version": "2012-10-17"
@@ -431,6 +475,39 @@
                                     ]
                                 ]
                             }
+                        },
+                        {
+                            "Sid": "DenyNonSSLRequests",
+                            "Action": "s3:*",
+                            "Condition": {
+                                "Bool": {
+                                    "aws:SecureTransport": "false"
+                                }
+                            },
+                            "Effect": "Deny",
+                            "Principal": "*",
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "CloudTrailBucket98B0BFE1",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "CloudTrailBucket98B0BFE1",
+                                                    "Arn"
+                                                ]
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                }
+                            ]
                         }
                     ],
                     "Version": "2012-10-17"

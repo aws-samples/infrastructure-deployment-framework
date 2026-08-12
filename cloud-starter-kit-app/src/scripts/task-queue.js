@@ -7,16 +7,7 @@ const TASK_TYPES = {
   CREATE_KEY: "create-key-pair",
   OTHER: "other",
 };
-const TASK_STATES = {
-  WAITING: "waiting",
-  STARTED: "started",
-  IN_PROGRESS: "in-progress",
-  COMPLETE: "complete",
-  FAILED: "failed",
-  FAILED_NEEDS_DELETION: "failed-needs-deletion",
-  DELETED: "deleted",
-  DELETE_FAILED: "delete-failed",
-};
+// TASK_STATES is defined in utilities.js (concatenated before this file)
 const TASK_EVENTS = {
   LOADING_COMPLETE: "LOADING_COMPLETE",
   KEY_READY: "KEY_READY",
@@ -222,7 +213,8 @@ function showTaskQueueLength() {
   } else {
     lockRegionControls(false);
   }
-  document.getElementById("tasks-display").innerText = `${taskQueue.length > 0 ? taskQueue.length : "No"} task${taskQueue.length > 1 ? "s" : ""} running`;
+  document.getElementById("tasks-display").innerText =
+    `${taskQueue.length > 0 ? taskQueue.length : "No"} task${taskQueue.length > 1 ? "s" : ""} running`;
 }
 
 setInterval(checkTasksFromStackList, 5000);
