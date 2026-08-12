@@ -183,3 +183,4 @@ The creation of the CloudFront distribution will take about 5 minutes, and the c
 
 Once complete, you should be able to navigate to your host, eg https://admin.yourhost.com/, and see a login box. Click Next to set up the admin portal. 
 
+Click <a href="using.en.md">next</a> to continue.

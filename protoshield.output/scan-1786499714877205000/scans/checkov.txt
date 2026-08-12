@@ -1,0 +1,109 @@
+=== CHECKOV SCAN RESULTS ===
+Scanning all infrastructure-as-code files (Terraform, Kubernetes, Helm, Dockerfile, CDK, CloudFormation, etc.)
+Note: CDK source code and CloudFormation templates are scanned for complementary coverage with CDK NAG and cfn-nag.
+
+cloudformation scan results:
+
+Passed checks: 100, Failed checks: 25, Skipped checks: 0
+
+Check: CKV_AWS_115: "Ensure that AWS Lambda function is configured for function-level concurrent execution limit"
+	FAILED for resource: AWS::Serverless::Function.getAllItemsFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:43-67
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-function-level-concurrent-execution-limit
+Check: CKV_AWS_117: "Ensure that AWS Lambda function is configured inside a VPC"
+	FAILED for resource: AWS::Serverless::Function.getAllItemsFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:43-67
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-inside-a-vpc-1
+Check: CKV_AWS_116: "Ensure that AWS Lambda function is configured for a Dead Letter Queue(DLQ)"
+	FAILED for resource: AWS::Serverless::Function.getAllItemsFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:43-67
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-a-dead-letter-queue-dlq
+Check: CKV_AWS_173: "Check encryption settings for Lambda environment variable"
+	FAILED for resource: AWS::Serverless::Function.getAllItemsFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:43-67
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-serverless-policies/bc-aws-serverless-5
+Check: CKV_AWS_115: "Ensure that AWS Lambda function is configured for function-level concurrent execution limit"
+	FAILED for resource: AWS::Serverless::Function.getByIdFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:72-96
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-function-level-concurrent-execution-limit
+Check: CKV_AWS_117: "Ensure that AWS Lambda function is configured inside a VPC"
+	FAILED for resource: AWS::Serverless::Function.getByIdFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:72-96
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-inside-a-vpc-1
+Check: CKV_AWS_116: "Ensure that AWS Lambda function is configured for a Dead Letter Queue(DLQ)"
+	FAILED for resource: AWS::Serverless::Function.getByIdFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:72-96
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-a-dead-letter-queue-dlq
+Check: CKV_AWS_173: "Check encryption settings for Lambda environment variable"
+	FAILED for resource: AWS::Serverless::Function.getByIdFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:72-96
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-serverless-policies/bc-aws-serverless-5
+Check: CKV_AWS_115: "Ensure that AWS Lambda function is configured for function-level concurrent execution limit"
+	FAILED for resource: AWS::Serverless::Function.putItemFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:101-125
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-function-level-concurrent-execution-limit
+Check: CKV_AWS_117: "Ensure that AWS Lambda function is configured inside a VPC"
+	FAILED for resource: AWS::Serverless::Function.putItemFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:101-125
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-inside-a-vpc-1
+Check: CKV_AWS_116: "Ensure that AWS Lambda function is configured for a Dead Letter Queue(DLQ)"
+	FAILED for resource: AWS::Serverless::Function.putItemFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:101-125
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-a-dead-letter-queue-dlq
+Check: CKV_AWS_173: "Check encryption settings for Lambda environment variable"
+	FAILED for resource: AWS::Serverless::Function.putItemFunction
+	File: /cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml:101-125
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-serverless-policies/bc-aws-serverless-5
+Check: CKV_AWS_23: "Ensure every security groups rule has a description"
+	FAILED for resource: AWS::EC2::SecurityGroup.GitSecurityGroup
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:55-79
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/networking-31
+Check: CKV_AWS_260: "Ensure no security groups allow ingress from 0.0.0.0:0 to port 80"
+	FAILED for resource: AWS::EC2::SecurityGroup.GitSecurityGroup
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:55-79
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-aws-security-groups-do-not-allow-ingress-from-00000-to-port-80
+Check: CKV_AWS_115: "Ensure that AWS Lambda function is configured for function-level concurrent execution limit"
+	FAILED for resource: AWS::Lambda::Function.CodePipelineIntegrationLambda
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:268-303
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-function-level-concurrent-execution-limit
+Check: CKV_AWS_117: "Ensure that AWS Lambda function is configured inside a VPC"
+	FAILED for resource: AWS::Lambda::Function.CodePipelineIntegrationLambda
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:268-303
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-inside-a-vpc-1
+Check: CKV_AWS_116: "Ensure that AWS Lambda function is configured for a Dead Letter Queue(DLQ)"
+	FAILED for resource: AWS::Lambda::Function.CodePipelineIntegrationLambda
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:268-303
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-aws-lambda-function-is-configured-for-a-dead-letter-queue-dlq
+Check: CKV_AWS_173: "Check encryption settings for Lambda environment variable"
+	FAILED for resource: AWS::Lambda::Function.CodePipelineIntegrationLambda
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:268-303
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-serverless-policies/bc-aws-serverless-5
+Check: CKV_AWS_364: "Ensure that AWS Lambda function permissions delegated to AWS services are limited by SourceArn or SourceAccount"
+	FAILED for resource: AWS::Lambda::Permission.CodePipelineCustomActionFunctionPermissions
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json:347-356
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/bc-aws-364
+Check: CKV_AWS_18: "Ensure the S3 bucket has access logging enabled"
+	FAILED for resource: AWS::S3::Bucket.AccessLogsBucket83982689
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/management-governance.json:207-238
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-13-enable-logging
+Check: CKV_AWS_21: "Ensure the S3 bucket has versioning enabled"
+	FAILED for resource: AWS::S3::Bucket.AccessLogsBucket83982689
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/management-governance.json:207-238
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-16-enable-versioning
+Check: CKV_AWS_111: "Ensure IAM policies does not allow write access without constraints"
+	FAILED for resource: AWS::IAM::Role.QBusinessCommonDataSourceRole
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/q-onedrive.json:55-170
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/ensure-iam-policies-do-not-allow-write-access-without-constraint
+Check: CKV_AWS_109: "Ensure IAM policies does not allow permissions management without constraints"
+	FAILED for resource: AWS::IAM::Role.QBusinessCommonDataSourceRole
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/q-onedrive.json:55-170
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/ensure-iam-policies-do-not-allow-permissions-management-resource-exposure-without-constraint
+Check: CKV_AWS_108: "Ensure IAM policies does not allow data exfiltration"
+	FAILED for resource: AWS::IAM::Role.QBusinessCommonDataSourceRole
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/q-onedrive.json:55-170
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/ensure-iam-policies-do-not-allow-data-exfiltration
+Check: CKV_AWS_149: "Ensure that Secrets Manager secret is encrypted using KMS CMK"
+	FAILED for resource: AWS::SecretsManager::Secret.OneDriveCredentialsSecret
+	File: /cloud-starter-kit-hub/www/kits/cfn-templates/q-onedrive.json:244-259
+	Guide: https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-secrets-manager-secret-is-encrypted-using-kms
+

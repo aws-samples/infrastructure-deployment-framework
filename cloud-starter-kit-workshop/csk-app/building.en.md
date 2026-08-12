@@ -80,3 +80,4 @@ or build a standalone packaged Electron app with:
 npm run make
 ```
 
+Click <a href="using.en.md">next</a> to get some tips about how to use the CSK app.

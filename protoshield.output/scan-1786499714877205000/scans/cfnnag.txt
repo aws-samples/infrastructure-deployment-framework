@@ -1,0 +1,172 @@
+=== CFN-NAG SCAN RESULTS ===
+Note: Scanning standalone CloudFormation templates only.
+CDK synthesized templates (cdk.out/) are analyzed by CDK NAG instead.
+
+Found 8 CloudFormation template(s) to scan
+
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/sam-apps/sam-api-example/template.yaml
+------------------------------------------------------------------------------------------------------------------------
+[31m| FAIL FATAL[0m
+[31m|[0m
+[31m| Unresolved logical resource ids: ["SampleTable"][0m
+
+Failures count: 1
+Warnings count: 0
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cdk-apps/ec2-asg-dns.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cdk-apps/ec2-asg-dns.json
+------------------------------------------------------------------------------------------------------------------------
+[31m| FAIL FATAL[0m
+[31m|[0m
+[31m| Illegal cfn - no Resources[0m
+
+Failures count: 1
+Warnings count: 0
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cdk-apps/ec2.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cdk-apps/ec2.json
+------------------------------------------------------------------------------------------------------------------------
+[31m| FAIL FATAL[0m
+[31m|[0m
+[31m| Illegal cfn - no Resources[0m
+
+Failures count: 1
+Warnings count: 0
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cdk-apps/mysql.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cdk-apps/mysql.json
+------------------------------------------------------------------------------------------------------------------------
+[31m| FAIL FATAL[0m
+[31m|[0m
+[31m| Illegal cfn - no Resources[0m
+
+Failures count: 1
+Warnings count: 0
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cfn-templates/git-repo.json
+------------------------------------------------------------------------------------------------------------------------
+[33m| WARN W89[0m
+[33m|[0m
+[33m| Resource: ["CodePipelineIntegrationLambda"][0m
+[33m| Line Numbers: [269][0m
+[33m|[0m
+[33m| Lambda functions should be deployed inside a VPC[0m
+------------------------------------------------------------
+[33m| WARN W92[0m
+[33m|[0m
+[33m| Resource: ["CodePipelineIntegrationLambda"][0m
+[33m| Line Numbers: [269][0m
+[33m|[0m
+[33m| Lambda functions should define ReservedConcurrentExecutions to reserve simultaneous executions[0m
+------------------------------------------------------------
+[33m| WARN W5[0m
+[33m|[0m
+[33m| Resource: ["GitSecurityGroup"][0m
+[33m| Line Numbers: [56][0m
+[33m|[0m
+[33m| Security Groups found with cidr open to world on egress[0m
+------------------------------------------------------------
+[33m| WARN W9[0m
+[33m|[0m
+[33m| Resource: ["GitSecurityGroup"][0m
+[33m| Line Numbers: [56][0m
+[33m|[0m
+[33m| Security Groups found with ingress cidr that is not /32[0m
+------------------------------------------------------------
+[33m| WARN W2[0m
+[33m|[0m
+[33m| Resource: ["GitSecurityGroup"][0m
+[33m| Line Numbers: [56][0m
+[33m|[0m
+[33m| Security Groups found with cidr open to world on ingress.  This should never be true on instance.  Permissible on ELB[0m
+------------------------------------------------------------
+[33m| WARN W36[0m
+[33m|[0m
+[33m| Resource: ["GitSecurityGroup"][0m
+[33m| Line Numbers: [56][0m
+[33m|[0m
+[33m| Security group rules without a description obscure their purpose and may lead to bad practices in ensuring they only allow traffic from the ports and sources/destinations required.[0m
+
+Failures count: 0
+Warnings count: 6
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cfn-templates/cost-management.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cfn-templates/cost-management.json
+------------------------------------------------------------
+Failures count: 0
+Warnings count: 0
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cfn-templates/management-governance.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cfn-templates/management-governance.json
+------------------------------------------------------------------------------------------------------------------------
+[33m| WARN W35[0m
+[33m|[0m
+[33m| Resource: ["AccessLogsBucket83982689"][0m
+[33m| Line Numbers: [208][0m
+[33m|[0m
+[33m| S3 Bucket should have access logging configured[0m
+
+Failures count: 0
+Warnings count: 1
+
+================================================================================
+Scanning: cloud-starter-kit-hub/www/kits/cfn-templates/q-onedrive.json
+================================================================================
+
+------------------------------------------------------------
+/project/cloud-starter-kit-hub/www/kits/cfn-templates/q-onedrive.json
+------------------------------------------------------------------------------------------------------------------------
+[33m| WARN W11[0m
+[33m|[0m
+[33m| Resource: ["QBusinessCommonDataSourceRole"][0m
+[33m| Line Numbers: [56][0m
+[33m|[0m
+[33m| IAM role should not allow * resource on its permissions policy[0m
+------------------------------------------------------------
+[33m| WARN W28[0m
+[33m|[0m
+[33m| Resource: ["QBusinessCommonDataSourceRole"][0m
+[33m| Line Numbers: [56][0m
+[33m|[0m
+[33m| Resource found with an explicit name, this disallows updates that require replacement of this resource[0m
+------------------------------------------------------------
+[33m| WARN W77[0m
+[33m|[0m
+[33m| Resource: ["OneDriveCredentialsSecret"][0m
+[33m| Line Numbers: [245][0m
+[33m|[0m
+[33m| Secrets Manager Secret should explicitly specify KmsKeyId. Besides control of the key this will allow the secret to be shared cross-account[0m
+
+Failures count: 0
+Warnings count: 3

@@ -139,3 +139,4 @@ Once complete, you should be able to navigate to your host and see files, eg
 
 Once you have the base deployment done, you can modify the contents under the `www` director in this project and run `cdk deploy` again to upload your changes to your Kit Hub. We'll cover this in more detail later.
 
+Click <a href="access-control.en.md">next</a> to read about how to use the Kit Hub.

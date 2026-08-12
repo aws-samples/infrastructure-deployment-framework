@@ -1,0 +1,101 @@
+=== ProtoShield Scan Started: 2026-08-12 01:55:14 UTC ===
+INFO: Resolved git-ignored paths for project copy /Users/guymor/Documents/repos/aws-samples/infrastructure-deployment-framework 11
+INFO: Building unified base image protoshield-base:v0.15.0-rc15
+INFO: Successfully built container image protoshield-base:v0.15.0-rc15
+INFO: Building unified plugin-tool layer protoshield:v0.15.0-rc15-29a2045022c8 protoshield-base:v0.15.0-rc15
+INFO: Successfully built container image protoshield:v0.15.0-rc15-29a2045022c8
+INFO: Cleaning up old base container images protoshield v0.15.0-rc15
+INFO: Cleaning up old base container images protoshield-base v0.15.0-rc15
+INFO: Cleaning up old base container images protoshield-project v0.15.0-rc15
+INFO: Resolved git-ignored paths for project copy /Users/guymor/Documents/repos/aws-samples/infrastructure-deployment-framework 11
+INFO: Generated combined .dockerignore for project copy 16 true 11 false 0
+INFO: Building project-specific container protoshield-project:v0.15.0-rc15-be3c248272f1
+INFO: Successfully built project-specific container protoshield-project:v0.15.0-rc15-be3c248272f1
+WARNING: Error loading config file: open /Users/guymor/.docker/config.json: operation not permitted
+=== ProtoShield: Starting scanner phase ===
+=== ProtoShield Scanner Started: 2026-08-12 01:57:34 UTC ===
+Starting security scans on /project/ directory...
+Results will be saved to /output/scans/ directory
+Environment: PROTOSHIELD_SCAN_ID=1786499714877205000
+STAGE: scanning
+PROGRESS: Security scans starting...
+Running security scans in parallel...
+Loaded 8 scanner plugins from /plugins.json
+Deferred 1 agentic plugin(s) to the agentic findings phase
+Running security scans in parallel...
+Starting secrets scan...
+Starting semgrep scan...
+Starting cdknag scan...
+Starting cfnnag scan...
+Starting bandit scan...
+Starting checkov scan...
+Starting cve scan...
+Starting license-headers scan...
+cdknag scan completed
+PROGRESS: Scanning 1/8
+license-headers scan completed
+PROGRESS: Scanning 2/8
+secrets scan completed
+PROGRESS: Scanning 3/8
+bandit scan completed
+PROGRESS: Scanning 4/8
+cfnnag scan completed
+PROGRESS: Scanning 5/8
+cve scan completed
+PROGRESS: Scanning 6/8
+checkov scan completed
+PROGRESS: Scanning 7/8
+semgrep scan completed
+PROGRESS: Scanning 8/8
+All scans and analysis completed
+STAGE: analysis_pending
+PROGRESS: Scans finished, starting analysis phase
+=== ProtoShield: Scanner phase complete ===
+All scans completed. Results saved to /output/scans/ directory
+=== ProtoShield: Starting agentic findings phase ===
+   Building protoshield-plugin-sdk @ file:///app/sdk
+      Built protoshield-plugin-sdk @ file:///app/sdk
+Uninstalled 1 package in 1ms
+Installed 1 package in 0.78ms
+Running agentic plugin: iam-least-privilege
+Found credentials in environment variables.
+Creating Strands MetricsClient
+Agentic plugin iam-least-privilege completed successfully
+=== ProtoShield: Agentic findings phase complete ===
+=== ProtoShield: Starting analysis phase ===
+STAGE: analysis
+PROGRESS: Initializing security analysis...
+Analyzing project: infrastructure-deployment-framework
+STAGE: analysis
+PROGRESS: Running security analysis agents...
+=== ProtoShield Analysis Started: 2026-08-12 01:58:45 UTC ===
+Plugin agent 'bandit' did not write its detail file on first pass; re-invoking to force completion.
+Detail file verification: 9/9 files found
+Analysis completed successfully
+STAGE: completed
+PROGRESS: Security analysis completed successfully
+Analysis completed. Results saved to output file.
+Suppression analysis: reviewing secrets suppressions
+Suppression analysis: reviewing semgrep suppressions
+Suppression analysis: reviewing cdknag suppressions
+Suppression analysis: reviewing cfnnag suppressions
+Suppression analysis: reviewing bandit suppressions
+Suppression analysis: reviewing checkov suppressions
+Plugin agent 'checkov-suppressions' did not write its detail file on first pass; re-invoking to force completion.
+Suppression analysis complete: 6 reviewed, 2 skipped, 0 failed
+Running action plugins...
+Running action plugin: markdown-report
+Calculated totals: Critical=16, High=166, Medium=87, Low=16
+Starting report assembly...
+Replaced Summary by Tool table with deterministic version (9 rows)
+Injected incomplete-coverage banner (1 scanner(s): cve)
+Injected scanner error warning banner (1 error(s) from: CDK NAG)
+Report assembly complete: /output/summary.md
+Appended 9 sub-agent sections
+Appended 'Incomplete Scan Coverage' section with 1 scanner(s)
+Validating final report...
+Final report validation complete
+Action plugin markdown-report completed successfully
+Action plugins complete: 1 executed, 0 failed
+=== Analysis Completed: 2026-08-12 02:03:36 UTC (291.0s total) ===
+=== ProtoShield: Analysis phase complete ===

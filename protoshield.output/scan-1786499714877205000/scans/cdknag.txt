@@ -1,0 +1,43 @@
+=== CDKNAG SCAN RESULTS ===
+Found CDK project in: /project/cloud-starter-kit-admin
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-admin
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-admin/kit-utils/cdk/python-example
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-admin/kit-utils/cdk/python-example
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-admin/kit-utils/cdk/ts-example
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-admin/kit-utils/cdk/ts-example
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/kit-utils/cdk/python-example
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/kit-utils/cdk/python-example
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/kit-utils/cdk/js-example
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/kit-utils/cdk/js-example
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/kit-utils/cdk/ts-example
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/kit-utils/cdk/ts-example
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/www/kits/cdk-apps/backup
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/www/kits/cdk-apps/backup
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/www/kits/cdk-apps/mysql
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/www/kits/cdk-apps/mysql
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/www/kits/cdk-apps/queue
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/www/kits/cdk-apps/queue
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/www/kits/cdk-apps/vpc-without-nat
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/www/kits/cdk-apps/vpc-without-nat
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/www/kits/cdk-apps/vpc-with-nat
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/www/kits/cdk-apps/vpc-with-nat
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-hub/www/kits/cdk-apps/ec2
+ERROR: No cdk.out folder found in /project/cloud-starter-kit-hub/www/kits/cdk-apps/ec2
+Please run 'cdk synth' in your CDK project first to generate the CloudFormation templates and CDK-nag results.
+Found CDK project in: /project/cloud-starter-kit-app/pipeline-assets/cdk-app-pipeline
+Found cdk.out folder, copying CDK-nag results
+No NagReport.csv files found in cdk.out (searched recursively)

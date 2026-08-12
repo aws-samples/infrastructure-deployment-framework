@@ -1,0 +1,112 @@
+=== LICENSE HEADER SCAN RESULTS ===
+Found license file: LICENSE
+
+=== LICENSE HEADER VALIDATION ===
+Required license text: Apache 2.0
+Accepted header markers: Apache License, Version 2.0, apache.org/licenses/LICENSE-2.0, SPDX-License-Identifier: Apache-2.0
+
+=== SUMMARY ===
+License file in root: Yes
+Total files scanned: 93
+Files with license header: 0
+Files missing license header: 93
+Compliance rate: 0.0%
+
+=== COMPLIANCE BREAKDOWN ===
+  missing license: 93 file(s)
+
+=== FILES MISSING LICENSE HEADERS ===
+The following files do NOT have the required license header:
+  MISSING (missing license): cloud-starter-kit-admin/app.py
+  MISSING (missing license): cloud-starter-kit-admin/custom-resources/customise_hosted_ui.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/js-example/bin/example.js
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/js-example/lib/example-stack.js
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/python-example/app.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/python-example/stacks/__init__.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/python-example/stacks/example_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/python-example/tests/__init__.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/python-example/tests/unit/__init__.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/python-example/tests/unit/test_vpc_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/ts-example/bin/example.ts
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cdk/ts-example/lib/example-stack.ts
+  MISSING (missing license): cloud-starter-kit-admin/kit-utils/cfn/flip-yaml.sh
+  MISSING (missing license): cloud-starter-kit-admin/lambda/admin.py
+  MISSING (missing license): cloud-starter-kit-admin/lambda/apig_authoriser.py
+  MISSING (missing license): cloud-starter-kit-admin/lambda/cognito_auth/index-template.js
+  MISSING (missing license): cloud-starter-kit-admin/lambda/config.py
+  MISSING (missing license): cloud-starter-kit-admin/lambda/lambda_edge.py
+  MISSING (missing license): cloud-starter-kit-admin/lambda/make_layer.sh
+  MISSING (missing license): cloud-starter-kit-admin/lambda/reporting.py
+  MISSING (missing license): cloud-starter-kit-admin/lambda/stats.py
+  MISSING (missing license): cloud-starter-kit-admin/stacks/__init__.py
+  MISSING (missing license): cloud-starter-kit-admin/stacks/api_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/stacks/cognito_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/stacks/cognito_ui_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/stacks/web_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/tests/__init__.py
+  MISSING (missing license): cloud-starter-kit-admin/tests/unit/__init__.py
+  MISSING (missing license): cloud-starter-kit-admin/tests/unit/test_starter_kit_aws_admin_stack.py
+  MISSING (missing license): cloud-starter-kit-admin/www/scripts/index-template.js
+  MISSING (missing license): cloud-starter-kit-admin/www/scripts/index.js
+  MISSING (missing license): cloud-starter-kit-app/forge.config.js
+  MISSING (missing license): cloud-starter-kit-app/pipeline-assets/cdk-app-pipeline/bin/cdk-app-pipeline.js
+  MISSING (missing license): cloud-starter-kit-app/pipeline-assets/cdk-app-pipeline/jest.config.js
+  MISSING (missing license): cloud-starter-kit-app/pipeline-assets/cdk-app-pipeline/lib/cdk-app-pipeline-stack.js
+  MISSING (missing license): cloud-starter-kit-app/pipeline-assets/cdk-app-pipeline/test/cdk-app-pipeline.test.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/deployments.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/get-amis-and-instance-types.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/get-bedrock-models.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/get-db-engines-and-instance-types.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/main.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/preload.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/preload.min.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/renderer.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/renderer.min.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/sdk-commands.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/stack-monitoring.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/task-queue.js
+  MISSING (missing license): cloud-starter-kit-app/src/scripts/utilities.js
+  MISSING (missing license): cloud-starter-kit-app/src/userdata/linux-arm64.sh
+  MISSING (missing license): cloud-starter-kit-app/src/userdata/linux-x86_64.sh
+  MISSING (missing license): cloud-starter-kit-app/test/renderer.concat.js
+  MISSING (missing license): cloud-starter-kit-hub/app.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/js-example/bin/example.js
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/js-example/lib/example-stack.js
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/python-example/app.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/python-example/stacks/__init__.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/python-example/stacks/example_stack.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/python-example/tests/__init__.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/python-example/tests/unit/__init__.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/python-example/tests/unit/test_vpc_stack.py
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/ts-example/bin/example.ts
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cdk/ts-example/lib/example-stack.ts
+  MISSING (missing license): cloud-starter-kit-hub/kit-utils/cfn/flip-yaml.sh
+  MISSING (missing license): cloud-starter-kit-hub/stacks/__init__.py
+  MISSING (missing license): cloud-starter-kit-hub/stacks/web_stack.py
+  MISSING (missing license): cloud-starter-kit-hub/tests/__init__.py
+  MISSING (missing license): cloud-starter-kit-hub/tests/unit/__init__.py
+  MISSING (missing license): cloud-starter-kit-hub/tests/unit/test_starter_kit_aws_admin_stack.py
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/backup/bin/aws-backup.ts
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/backup/lib/aws-backup-stack.ts
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/ec2/bin/ec2.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/ec2/jest.config.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/ec2/lib/ec2-stack.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/ec2/test/ec2.test.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/mysql/bin/mysql.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/mysql/jest.config.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/mysql/lib/mysql-stack.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/mysql/test/mysql.test.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/queue/bin/queue.d.ts
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/queue/bin/queue.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/queue/bin/queue.ts
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/queue/lib/queue-stack.d.ts
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/queue/lib/queue-stack.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/queue/lib/queue-stack.ts
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-with-nat/bin/vpc-with-nat.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-with-nat/jest.config.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-with-nat/lib/vpc-with-nat.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-with-nat/test/js-kit.test.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-without-nat/bin/vpc-without-nat.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-without-nat/jest.config.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-without-nat/lib/vpc-without-nat.js
+  MISSING (missing license): cloud-starter-kit-hub/www/kits/cdk-apps/vpc-without-nat/test/js-kit.test.js
