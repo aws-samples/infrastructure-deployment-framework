@@ -1,5 +1,0 @@
-=== CVE SCAN ===
-Scanning /project/cloud-starter-kit-hub/www/kits/cdk-apps/backup/package.json for CVEs:
-NO LOCK FILE FOUND: package.json has no accompanying lock file (package-lock.json, pnpm-lock.yaml, yarn.lock, bun.lock).
-Dependencies could NOT be scanned - vulnerability status is UNKNOWN.
-A lock file pins the full (transitive) dependency tree, which is required for reliable vulnerability scanning and is a security best practice. Generate and commit one (npm install / pnpm install / yarn install).
