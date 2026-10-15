@@ -755,6 +755,39 @@
                                     ]
                                 }
                             ]
+                        },
+                        {
+                            "Sid": "DenyNonSSLRequests",
+                            "Action": "s3:*",
+                            "Condition": {
+                                "Bool": {
+                                    "aws:SecureTransport": "false"
+                                }
+                            },
+                            "Effect": "Deny",
+                            "Principal": "*",
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "ConfigBucket2112C5EC",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "ConfigBucket2112C5EC",
+                                                    "Arn"
+                                                ]
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                }
+                            ]
                         }
                     ],
                     "Version": "2012-10-17"
